@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Firebase 실시간 오목</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f1f3f5;
+            padding: 24px 16px;
+        }
+
+        h1 {
+            margin-bottom: 12px;
+            color: #212529;
+            font-size: 1.8rem;
+        }
+
+        #status-bar {
+            margin-bottom: 16px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #343a40;
+            min-height: 27px;
+        }
+
+        #lobby {
+            margin-bottom: 20px;
+            background: #ffffff;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        input, select, button {
+            padding: 8px 14px;
+            font-size: 0.95rem;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            outline: none;
+        }
+
+            input:focus, select:focus {
+                border-color: #228be6;
+            }
+
+        button {
+            background-color: #228be6;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+            button:hover:not(:disabled) {
+                background-color: #1c7ed6;
+            }
+
+            button:disabled {
+                background-color: #adb5bd;
+                cursor: not-allowed;
+            }
+
+        #reset-btn {
+            background-color: #fa5252;
+        }
+
+            #reset-btn:hover:not(:disabled) {
+                background-color: #e03131;
+            }
+
+        #board-container {
+            background-color: #d89853;
+            padding: 18px;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(15, 34px);
+            grid-template-rows: repeat(15, 34px);
+            background-color: #deb887;
+        }
+
+        .cell {
+            width: 34px;
+            height: 34px;
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+            .cell::before {
+                content: '';
+                position: absolute;
+                width: 100%;
+                height: 1px;
+                background-color: #5c3a21;
+                top: 50%;
+                left: 0;
+            }
+
+            .cell::after {
+                content: '';
+                position: absolute;
+                width: 1px;
+                height: 100%;
+                background-color: #5c3a21;
+                left: 50%;
+                top: 0;
+            }
+
+        .stone {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            z-index: 2;
+            box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.35);
+        }
+
+            .stone.black {
+                background: radial-gradient(circle at 35% 35%, #555, #111);
+            }
+
+            .stone.white {
+                background: radial-gradient(circle at 35% 35%, #ffffff, #dcdcdc);
+                border: 1px solid #ced4da;
+            }
+    </style>
+</head>
+<body>
+
+    <h1>Firebase 실시간 오목</h1>
+    <div id="status-bar">방 이름을 입력하고 입장해주세요.</div>
+
+    <div id="lobby">
+        <input type="text" id="room-input" placeholder="방 이름 (예: room1)">
+        <button id="join-btn">방 입장</button>
+        <span id="role-area" style="display: none; gap: 8px; align-items: center;">
+            <label for="stone-select">돌 선택:</label>
+            <select id="stone-select">
+                <option value="black">흑돌 (선공)</option>
+                <option value="white">백돌 (후공)</option>
+            </select>
+            <button id="ready-btn">준비 완료</button>
+        </span>
+        <button id="reset-btn" style="display: none;">새 게임</button>
+    </div>
+
+    <div id="board-container">
+        <div id="board"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+        import {
+            getDatabase, ref, set, update, onValue, onDisconnect, runTransaction
+        } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD3vjuiYIX_JxaLaw4CPQ72bRC2rekBf0s",
+            authDomain: "omok-test-2b6df.firebaseapp.com",
+            databaseURL: "https://omok-test-2b6df-default-rtdb.firebaseio.com",
+            projectId: "omok-test-2b6df",
+            storageBucket: "omok-test-2b6df.firebasestorage.app",
+            messagingSenderId: "264913789921",
+            appId: "1:264913789921:web:c10bc870a5502b8de568a0",
+            measurementId: "G-HRQQ68W4QM"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const BOARD_SIZE = 15;
+        const playerId = 'p_' + Math.random().toString(36).substring(2, 9);
+
+        let roomId = null;
+        let roomRef = null;
+        let myRole = null;
+        let isMyTurn = false;
+
+        // DOM 요소
+        const statusBar = document.getElementById('status-bar');
+        const roomInput = document.getElementById('room-input');
+        const joinBtn = document.getElementById('join-btn');
+        const roleArea = document.getElementById('role-area');
+        const stoneSelect = document.getElementById('stone-select');
+        const readyBtn = document.getElementById('ready-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const boardEl = document.getElementById('board');
+
+        // 15x15 바둑판 그리드 생성
+        for (let r = 0; r < BOARD_SIZE; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.onclick = () => handleCellClick(r, c);
+                boardEl.appendChild(cell);
+            }
+        }
+
+        // 방 입장 핸들러
+        joinBtn.onclick = () => {
+            roomId = roomInput.value.trim();
+            if (!roomId) return alert('방 이름을 입력하세요.');
+
+            roomRef = ref(db, `rooms/${roomId}`);
+            const playerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
+
+            // 접속 종료 시 플레이어 자동 제거
+            onDisconnect(playerRef).remove();
+            set(playerRef, { role: null, ready: false });
+
+            joinBtn.disabled = true;
+            roomInput.disabled = true;
+            roleArea.style.display = 'inline-flex';
+
+            // 실시간 데이터 감지
+            onValue(roomRef, (snapshot) => {
+                const data = snapshot.val();
+                if (!data) return;
+                handleRoomUpdate(data);
+            });
+        };
+
+        // 준비 완료 및 돌 선택 핸들러
+        readyBtn.onclick = async () => {
+            const selectedRole = stoneSelect.value;
+            const snapshot = await new Promise((resolve) => onValue(roomRef, resolve, { onlyOnce: true }));
+            const roomData = snapshot.val();
+            const players = roomData?.players || {};
+
+            // 중복 돌 선택 방지
+            const isTaken = Object.entries(players).some(([id, p]) => id !== playerId && p.role === selectedRole);
+            if (isTaken) {
+                return alert('상대방이 이미 해당 돌을 선택했습니다. 다른 돌을 선택하세요.');
+            }
+
+            myRole = selectedRole;
+            readyBtn.disabled = true;
+            stoneSelect.disabled = true;
+
+            await update(ref(db, `rooms/${roomId}/players/${playerId}`), {
+                role: myRole,
+                ready: true
+            });
+
+            // 시작 조건 확인
+            checkGameStart({
+                ...players,
+                [playerId]: { role: myRole, ready: true }
+            });
+        };
+
+        function checkGameStart(players) {
+            const ids = Object.keys(players);
+            if (ids.length === 2) {
+                const p1 = players[ids[0]];
+                const p2 = players[ids[1]];
+                if (p1.ready && p2.ready && p1.role && p2.role && p1.role !== p2.role) {
+                    update(roomRef, {
+                        gameStarted: true,
+                        currentTurn: 'black',
+                        winner: null
+                    });
+                }
+            }
+        }
+
+        // 상태 업데이트 반영
+        function handleRoomUpdate(data) {
+            const players = data.players || {};
+            const count = Object.keys(players).length;
+            const me = players[playerId];
+
+            // 게임 재설정 감지 시 UI 복원
+            if (!data.gameStarted && !data.winner && (!me || !me.ready)) {
+                readyBtn.disabled = false;
+                stoneSelect.disabled = false;
+                myRole = null;
+            }
+
+            renderBoard(data.board || {});
+
+            // 1. 승리 판정 시
+            if (data.winner) {
+                const winnerText = data.winner === 'black' ? '흑돌(Black)' : '백돌(White)';
+                statusBar.innerText = `게임 종료! 승자: ${winnerText}`;
+                resetBtn.style.display = 'inline-block';
+                isMyTurn = false;
+                return;
+            }
+
+            resetBtn.style.display = 'none';
+
+            // 2. 대기 상태 시
+            if (!data.gameStarted) {
+                statusBar.innerText = count < 2
+                    ? '상대방 입장을 기다리고 있습니다... (1/2)'
+                    : '돌을 선택하고 준비 완료를 눌러주세요.';
+                isMyTurn = false;
+                return;
+            }
+
+            // 3. 게임 진행 중
+            isMyTurn = (data.currentTurn === myRole);
+            const turnText = data.currentTurn === 'black' ? '흑돌' : '백돌';
+            const myRoleText = myRole === 'black' ? '흑돌' : '백돌';
+
+            statusBar.innerText = isMyTurn
+                ? `[나: ${myRoleText}] 내 차례입니다. 돌을 놓아주세요.`
+                : `[나: ${myRoleText}] 상대방(${turnText})이 생각 중입니다...`;
+        }
+
+        // 돌 착수 처리 (원자적 트랜잭션 적용)
+        async function handleCellClick(r, c) {
+            if (!isMyTurn || !roomId) return;
+
+            const cellKey = `${r}_${c}`;
+
+            await runTransaction(roomRef, (currentRoom) => {
+                if (!currentRoom || !currentRoom.gameStarted || currentRoom.winner) return currentRoom;
+                if (currentRoom.currentTurn !== myRole) return currentRoom;
+
+                currentRoom.board = currentRoom.board || {};
+                if (currentRoom.board[cellKey]) return currentRoom; // 이미 놓인 자리 무시
+
+                currentRoom.board[cellKey] = myRole;
+
+                if (checkWin(currentRoom.board, r, c, myRole)) {
+                    currentRoom.winner = myRole;
+                    currentRoom.gameStarted = false;
+                } else {
+                    currentRoom.currentTurn = myRole === 'black' ? 'white' : 'black';
+                }
+
+                return currentRoom;
+            });
+        }
+
+        // 화면 보드 렌더링
+        function renderBoard(boardData) {
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const index = r * BOARD_SIZE + c;
+                    const cell = boardEl.children[index];
+                    const val = boardData[`${r}_${c}`];
+
+                    const existingStone = cell.querySelector('.stone');
+                    if (existingStone) cell.removeChild(existingStone);
+
+                    if (val) {
+                        const stone = document.createElement('div');
+                        stone.className = `stone ${val}`;
+                        cell.appendChild(stone);
+                    }
+                }
+            }
+        }
+
+        // 5목 연속 승리 검증 (가로, 세로, 양쪽 대각선)
+        function checkWin(boardData, r, c, color) {
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+            for (const [dr, dc] of directions) {
+                let count = 1;
+                for (let step = 1; step < 5; step++) {
+                    if (boardData[`${r + dr * step}_${c + dc * step}`] === color) count++;
+                    else break;
+                }
+                for (let step = 1; step < 5; step++) {
+                    if (boardData[`${r - dr * step}_${c - dc * step}`] === color) count++;
+                    else break;
+                }
+                if (count >= 5) return true;
+            }
+            return false;
+        }
+
+        // 새 게임 초기화
+        resetBtn.onclick = () => {
+            runTransaction(roomRef, (roomData) => {
+                if (!roomData) return roomData;
+                roomData.board = null;
+                roomData.gameStarted = false;
+                roomData.winner = null;
+                roomData.currentTurn = 'black';
+
+                // 모든 플레이어 준비 상태 리셋
+                if (roomData.players) {
+                    Object.keys(roomData.players).forEach((id) => {
+                        roomData.players[id].ready = false;
+                        roomData.players[id].role = null;
+                    });
+                }
+                return roomData;
+            });
+        };
+    </script>
+</body>
+</html>
