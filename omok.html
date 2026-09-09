@@ -212,7 +212,6 @@
 
         .bubble.show {
             opacity: 1;
-            visibility: hidden; /* 애니메이션 제어용 */
             visibility: visible;
             top: -60px;
         }
@@ -461,7 +460,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
         import {
-            getDatabase, ref, set, update, onValue, onDisconnect, runTransaction
+            getDatabase, ref, set, update, remove, onValue, onDisconnect, runTransaction, serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
         const firebaseConfig = {
@@ -485,6 +484,7 @@
         let roomRef = null;
         let myRole = null;
         let isMyTurn = false;
+        let inactivityInterval = null;
 
         // DOM 요소
         const statusBar = document.getElementById('status-bar');
@@ -521,7 +521,7 @@
                 const btn = document.createElement('button');
                 btn.className = 'emo-btn';
                 btn.innerText = emo;
-                btn.onclick = () => sendChatMessage(emo);
+                btn.onclick = () => sendActionActivity(emo);
                 emoGroups[color].appendChild(btn);
             });
         }
@@ -555,7 +555,7 @@
 
             runTransaction(roomRef, (roomData) => {
                 if (roomData === null) {
-                    roomData = { players: {}, gameStarted: false };
+                    roomData = { players: {}, gameStarted: false, lastActivity: serverTimestamp() };
                 }
                 if (!roomData.players) roomData.players = {};
 
@@ -582,6 +582,7 @@
                     roomData.board = {};
                 }
 
+                roomData.lastActivity = serverTimestamp();
                 return roomData;
             }).then(({ committed, snapshot }) => {
                 if (!committed) {
@@ -592,30 +593,44 @@
 
                 onValue(roomRef, (snap) => {
                     const data = snap.val();
-                    if (data) handleRoomUpdate(data);
+                    if (!data) {
+                        // 방이 폭파되었거나 존재하지 않는 경우
+                        alert('2분 동안 반응이 없어 방이 폭파되었습니다.');
+                        location.reload();
+                        return;
+                    }
+                    handleRoomUpdate(data);
                 });
+
+                // 2분 비활동 감지 타이머 시작 (방을 생성한 사람이나 들어간 사람이 주기적으로 체크)
+                startInactivityChecker();
             });
         };
 
-        // 채팅 및 이모티콘 전송 공통 함수
-        function sendChatMessage(msg) {
+        // 활동 시간 갱신을 동반하는 액션 처리
+        function sendActionActivity(msg) {
             if (!myRole || !msg.trim()) return;
             const myRef = ref(db, `rooms/${roomId}/players/${playerId}`);
             update(myRef, {
                 message: msg.trim(),
-                messageId: Date.now() // 고유 ID 변경으로 리스너 트리거
+                messageId: Date.now()
+            });
+
+            // 방의 마지막 활동 시간 갱신
+            update(roomRef, {
+                lastActivity: serverTimestamp()
             });
         }
 
         // 채팅 입력창 이벤트
         chatBtn.onclick = () => {
-            sendChatMessage(chatInput.value);
+            sendActionActivity(chatInput.value);
             chatInput.value = '';
         };
 
         chatInput.onkeydown = (e) => {
             if (e.key === 'Enter') {
-                sendChatMessage(chatInput.value);
+                sendActionActivity(chatInput.value);
                 chatInput.value = '';
             }
         };
@@ -644,7 +659,6 @@
 
                 if (isMe) disableControls(p.role, false);
 
-                // 새로운 메시지가 들어온 경우
                 if (p.messageId && p.messageId !== lastMessageIds[p.role]) {
                     lastMessageIds[p.role] = p.messageId;
                     showBubble(p.role, p.message);
@@ -683,29 +697,26 @@
             }
         }
 
-        // 말풍선 표시 및 4초 후 제거/새 메시지 갱신 처리
+        // 말풍선 표시 및 4초 후 제거
         function showBubble(role, text) {
             const bubble = bubbles[role];
 
-            // 기존 타이머 취소 (새 메시지가 오면 기존 사라짐 대기 초기화)
             if (messageTimeouts[role]) {
                 clearTimeout(messageTimeouts[role]);
                 bubble.classList.remove('show');
             }
 
-            // 약간의 딜레이 후 새로운 메시지 적용 및 표시 (이전 말풍선과의 자연스러운 교체)
             setTimeout(() => {
                 bubble.innerText = text;
                 bubble.classList.add('show');
 
-                // 4초 뒤 숨김 처리
                 messageTimeouts[role] = setTimeout(() => {
                     bubble.classList.remove('show');
                 }, 4000);
             }, 50);
         }
 
-        // 컨트롤(이모티콘 및 채팅 입력) 활성화/비활성화
+        // 컨트롤 활성화/비활성화
         function disableControls(role, disabled) {
             const btns = emoGroups[role].querySelectorAll('.emo-btn');
             btns.forEach(btn => btn.disabled = disabled);
@@ -737,8 +748,33 @@
                 } else {
                     currentRoom.currentTurn = myRole === 'black' ? 'white' : 'black';
                 }
+                currentRoom.lastActivity = serverTimestamp();
                 return currentRoom;
             });
+        }
+
+        // 2분(120,000ms) 동안 활동이 없으면 방 삭제 실행 체크 함수
+        function startInactivityChecker() {
+            if (inactivityInterval) clearInterval(inactivityInterval);
+
+            inactivityInterval = setInterval(() => {
+                if (!roomId || !roomRef) return;
+
+                onValue(roomRef, (snap) => {
+                    const data = snap.val();
+                    if (!data) return;
+
+                    const lastActivity = data.lastActivity;
+                    if (lastActivity) {
+                        const now = Date.now();
+                        const diff = now - lastActivity;
+                        // 2분 (120,000 밀리초) 경과 시 방 삭제
+                        if (diff > 120000) {
+                            remove(roomRef).catch(() => {});
+                        }
+                    }
+                }, { onlyOnce: true });
+            }, 10000); // 10초마다 체크
         }
 
         // 보드 그리기
@@ -798,6 +834,7 @@
                     roomData.gameStarted = true;
                     roomData.currentTurn = 'black';
                 }
+                roomData.lastActivity = serverTimestamp();
                 return roomData;
             });
         };
