@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title> 오목</title>
+    <title>오목</title>
     <style>
         :root {
             --primary: #4dabf7;
@@ -73,9 +73,9 @@
             width: 200px;
         }
 
-            input:focus {
-                border-color: var(--primary);
-            }
+        input:focus {
+            border-color: var(--primary);
+        }
 
         button {
             background-color: var(--primary);
@@ -86,17 +86,17 @@
             box-shadow: 0 4px 12px rgba(77, 171, 247, 0.3);
         }
 
-            button:hover:not(:disabled) {
-                background-color: var(--primary-hover);
-                transform: translateY(-1px);
-            }
+        button:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+        }
 
-            button:disabled {
-                background-color: #ced4da;
-                cursor: not-allowed;
-                box-shadow: none;
-                transform: none;
-            }
+        button:disabled {
+            background-color: #ced4da;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
 
         #reset-btn {
             background-color: #ff6b6b;
@@ -105,19 +105,27 @@
             margin-bottom: 20px;
         }
 
-            #reset-btn:hover:not(:disabled) {
-                background-color: #fa5252;
-            }
+        #reset-btn:hover:not(:disabled) {
+            background-color: #fa5252;
+        }
 
         /* 게임 영역 (좌/우 캐릭터 + 중앙 보드) */
-        #game-area {
+        #game-wrapper {
             display: none; /* 방 입장 전에는 숨김 */
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        #game-area {
+            display: flex;
             flex-direction: row;
             align-items: center;
             justify-content: center;
             gap: 40px;
             width: 100%;
-            max-width: 1000px;
         }
 
         /* 플레이어 패널 (캐릭터) */
@@ -135,10 +143,10 @@
             transition: border-color 0.3s;
         }
 
-            .player-panel.active {
-                border-color: var(--primary);
-                transform: scale(1.05);
-            }
+        .player-panel.active {
+            border-color: var(--primary);
+            transform: scale(1.05);
+        }
 
         .avatar {
             width: 80px;
@@ -161,16 +169,16 @@
             margin-bottom: 16px;
         }
 
-            .role-badge.black {
-                background: #212529;
-                color: white;
-            }
+        .role-badge.black {
+            background: #212529;
+            color: white;
+        }
 
-            .role-badge.white {
-                background: #f8f9fa;
-                color: #212529;
-                border: 1px solid #dee2e6;
-            }
+        .role-badge.white {
+            background: #f8f9fa;
+            color: #212529;
+            border: 1px solid #dee2e6;
+        }
 
         .player-name {
             font-weight: 600;
@@ -179,39 +187,46 @@
             text-align: center;
         }
 
-        /* 말풍선 (이모티콘) */
+        /* 말풍선 (이모티콘 + 채팅 겸용) */
         .bubble {
             position: absolute;
-            top: -40px;
+            top: -50px;
             left: 50%;
             transform: translateX(-50%);
             background: white;
-            padding: 8px 12px;
+            padding: 8px 14px;
             border-radius: 20px;
-            font-size: 1.5rem;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text-dark);
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             opacity: 0;
             visibility: hidden;
             transition: all 0.3s ease;
             z-index: 10;
+            max-width: 200px;
+            word-break: break-all;
+            text-align: center;
+            white-space: nowrap;
         }
 
-            .bubble.show {
-                opacity: 1;
-                visibility: visible;
-                top: -50px;
-            }
+        .bubble.show {
+            opacity: 1;
+            visibility: hidden; /* 애니메이션 제어용 */
+            visibility: visible;
+            top: -60px;
+        }
 
-            .bubble::after {
-                content: '';
-                position: absolute;
-                bottom: -6px;
-                left: 50%;
-                transform: translateX(-50%);
-                border-width: 6px 6px 0;
-                border-style: solid;
-                border-color: white transparent transparent transparent;
-            }
+        .bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: white transparent transparent transparent;
+        }
 
         /* 이모티콘 버튼 그룹 */
         .emoticon-group {
@@ -233,16 +248,42 @@
             align-items: center;
             justify-content: center;
             transition: background 0.2s;
+            box-shadow: none;
         }
 
-            .emo-btn:hover {
-                background: #e9ecef;
-            }
+        .emo-btn:hover {
+            background: #e9ecef;
+        }
 
-            .emo-btn:disabled {
-                opacity: 0.5;
-                cursor: not-allowed;
-            }
+        .emo-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 채팅 입력 영역 */
+        #chat-container {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            max-width: 400px;
+            background: white;
+            padding: 12px;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        #chat-input {
+            flex: 1;
+            width: auto;
+            padding: 10px 14px;
+            font-size: 0.95rem;
+        }
+
+        #chat-btn {
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            box-shadow: 0 2px 8px rgba(77, 171, 247, 0.3);
+        }
 
         /* 오목판 */
         #board-container {
@@ -269,48 +310,47 @@
             justify-content: center;
         }
 
-            .cell::before {
-                content: '';
-                position: absolute;
-                width: 100%;
-                height: 1px;
-                background-color: var(--board-line);
-                top: 50%;
-                left: 0;
-                z-index: 1;
-            }
+        .cell::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            background-color: var(--board-line);
+            top: 50%;
+            left: 0;
+            z-index: 1;
+        }
 
-            .cell::after {
-                content: '';
-                position: absolute;
-                width: 1px;
-                height: 100%;
-                background-color: var(--board-line);
-                left: 50%;
-                top: 0;
-                z-index: 1;
-            }
+        .cell::after {
+            content: '';
+            position: absolute;
+            width: 1px;
+            height: 100%;
+            background-color: var(--board-line);
+            left: 50%;
+            top: 0;
+            z-index: 1;
+        }
 
-            /* 테두리 선 마감 처리 */
-            .cell:nth-child(15n + 1)::before {
-                width: 50%;
-                left: 50%;
-            }
+        .cell:nth-child(15n + 1)::before {
+            width: 50%;
+            left: 50%;
+        }
 
-            .cell:nth-child(15n)::before {
-                width: 50%;
-                right: 50%;
-            }
+        .cell:nth-child(15n)::before {
+            width: 50%;
+            right: 50%;
+        }
 
-            .cell:nth-child(-n + 15)::after {
-                height: 50%;
-                top: 50%;
-            }
+        .cell:nth-child(-n + 15)::after {
+            height: 50%;
+            top: 50%;
+        }
 
-            .cell:nth-last-child(-n + 15)::after {
-                height: 50%;
-                bottom: 50%;
-            }
+        .cell:nth-last-child(-n + 15)::after {
+            height: 50%;
+            bottom: 50%;
+        }
 
         /* 바둑돌 */
         .stone {
@@ -327,7 +367,6 @@
                 transform: scale(0);
                 opacity: 0;
             }
-
             100% {
                 transform: scale(1);
                 opacity: 1;
@@ -366,12 +405,12 @@
             }
 
             .bubble {
-                top: -30px;
+                top: -40px;
             }
 
-                .bubble.show {
-                    top: -40px;
-                }
+            .bubble.show {
+                top: -50px;
+            }
         }
     </style>
 </head>
@@ -386,32 +425,36 @@
 
     <button id="reset-btn">게임 다시 시작</button>
 
-    <div id="game-area">
-        <!-- 왼쪽: 흑돌 플레이어 -->
-        <div class="player-panel" id="panel-black">
-            <div class="bubble" id="bubble-black">😀</div>
-            <div class="avatar">👨‍🚀</div>
-            <div class="role-badge black">흑돌 (선공)</div>
-            <div class="player-name" id="name-black">대기 중...</div>
-            <div class="emoticon-group" id="emo-group-black">
-                <!-- JS에서 버튼 생성 -->
+    <div id="game-wrapper">
+        <div id="game-area">
+            <!-- 왼쪽: 흑돌 플레이어 -->
+            <div class="player-panel" id="panel-black">
+                <div class="bubble" id="bubble-black"></div>
+                <div class="avatar">👨‍🚀</div>
+                <div class="role-badge black">흑돌 (선공)</div>
+                <div class="player-name" id="name-black">대기 중...</div>
+                <div class="emoticon-group" id="emo-group-black"></div>
+            </div>
+
+            <!-- 중앙: 오목판 -->
+            <div id="board-container">
+                <div id="board"></div>
+            </div>
+
+            <!-- 오른쪽: 백돌 플레이어 -->
+            <div class="player-panel" id="panel-white">
+                <div class="bubble" id="bubble-white"></div>
+                <div class="avatar">🤖</div>
+                <div class="role-badge white">백돌 (후공)</div>
+                <div class="player-name" id="name-white">대기 중...</div>
+                <div class="emoticon-group" id="emo-group-white"></div>
             </div>
         </div>
 
-        <!-- 중앙: 오목판 -->
-        <div id="board-container">
-            <div id="board"></div>
-        </div>
-
-        <!-- 오른쪽: 백돌 플레이어 -->
-        <div class="player-panel" id="panel-white">
-            <div class="bubble" id="bubble-white">😀</div>
-            <div class="avatar">🤖</div>
-            <div class="role-badge white">백돌 (후공)</div>
-            <div class="player-name" id="name-white">대기 중...</div>
-            <div class="emoticon-group" id="emo-group-white">
-                <!-- JS에서 버튼 생성 -->
-            </div>
+        <!-- 하단 중간: 채팅 입력 칸 -->
+        <div id="chat-container">
+            <input type="text" id="chat-input" placeholder="채팅을 입력하세요..." disabled>
+            <button id="chat-btn" disabled>전송</button>
         </div>
     </div>
 
@@ -421,7 +464,6 @@
             getDatabase, ref, set, update, onValue, onDisconnect, runTransaction
         } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
-        // 기존과 동일한 Firebase 설정
         const firebaseConfig = {
             apiKey: "AIzaSyD3vjuiYIX_JxaLaw4CPQ72bRC2rekBf0s",
             authDomain: "omok-test-2b6df.firebaseapp.com",
@@ -449,9 +491,11 @@
         const lobby = document.getElementById('lobby');
         const joinBtn = document.getElementById('join-btn');
         const roomInput = document.getElementById('room-input');
-        const gameArea = document.getElementById('game-area');
+        const gameWrapper = document.getElementById('game-wrapper');
         const resetBtn = document.getElementById('reset-btn');
         const boardEl = document.getElementById('board');
+        const chatInput = document.getElementById('chat-input');
+        const chatBtn = document.getElementById('chat-btn');
 
         const panels = {
             black: document.getElementById('panel-black'),
@@ -477,7 +521,7 @@
                 const btn = document.createElement('button');
                 btn.className = 'emo-btn';
                 btn.innerText = emo;
-                btn.onclick = () => sendEmoticon(emo);
+                btn.onclick = () => sendChatMessage(emo);
                 emoGroups[color].appendChild(btn);
             });
         }
@@ -504,12 +548,11 @@
             const myPlayerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
 
             lobby.style.display = 'none';
-            gameArea.style.display = 'flex';
+            gameWrapper.style.display = 'flex';
             statusBar.innerText = '방에 접속 중입니다...';
 
             onDisconnect(myPlayerRef).remove();
 
-            // 트랜잭션을 통해 동시성 문제를 방지하고 역할을 랜덤하게 할당
             runTransaction(roomRef, (roomData) => {
                 if (roomData === null) {
                     roomData = { players: {}, gameStarted: false };
@@ -518,19 +561,16 @@
 
                 const currentPlayers = Object.keys(roomData.players);
 
-                // 이미 방이 꽉 찬 경우
                 if (currentPlayers.length >= 2 && !roomData.players[playerId]) {
-                    return; // 취소 (Transaction abort)
+                    return; 
                 }
 
-                // 내 정보 추가
                 if (!roomData.players[playerId]) {
-                    roomData.players[playerId] = { role: null, emojiId: 0, emoji: '' };
+                    roomData.players[playerId] = { role: null, messageId: 0, message: '' };
                 }
 
                 const updatedPlayers = Object.keys(roomData.players);
 
-                // 두 명이 모이면 랜덤하게 흑/백 부여 후 게임 시작
                 if (updatedPlayers.length === 2 && !roomData.gameStarted) {
                     const isBlackFirst = Math.random() < 0.5;
                     roomData.players[updatedPlayers[0]].role = isBlackFirst ? 'black' : 'white';
@@ -550,7 +590,6 @@
                     return;
                 }
 
-                // 데이터 리스너 등록
                 onValue(roomRef, (snap) => {
                     const data = snap.val();
                     if (data) handleRoomUpdate(data);
@@ -558,34 +597,44 @@
             });
         };
 
-        // 이모티콘 전송
-        function sendEmoticon(emo) {
-            if (!myRole) return;
+        // 채팅 및 이모티콘 전송 공통 함수
+        function sendChatMessage(msg) {
+            if (!myRole || !msg.trim()) return;
             const myRef = ref(db, `rooms/${roomId}/players/${playerId}`);
             update(myRef, {
-                emoji: emo,
-                emojiId: Date.now() // 고유 ID를 변경해 이벤트 트리거
+                message: msg.trim(),
+                messageId: Date.now() // 고유 ID 변경으로 리스너 트리거
             });
         }
 
-        let lastEmojiIds = { black: 0, white: 0 };
-        let emojiTimeouts = { black: null, white: null };
+        // 채팅 입력창 이벤트
+        chatBtn.onclick = () => {
+            sendChatMessage(chatInput.value);
+            chatInput.value = '';
+        };
+
+        chatInput.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                sendChatMessage(chatInput.value);
+                chatInput.value = '';
+            }
+        };
+
+        let lastMessageIds = { black: 0, white: 0 };
+        let messageTimeouts = { black: null, white: null };
 
         // 상태 업데이트 처리
         function handleRoomUpdate(data) {
             const players = data.players || {};
             const playerIds = Object.keys(players);
 
-            // 내 역할 확인
             myRole = players[playerId]?.role;
 
-            // UI 초기화
             names.black.innerText = '대기 중...';
             names.white.innerText = '대기 중...';
-            disableEmoticons('black', true);
-            disableEmoticons('white', true);
+            disableControls('black', true);
+            disableControls('white', true);
 
-            // 접속자 패널 업데이트 및 이모티콘 처리
             Object.entries(players).forEach(([id, p]) => {
                 if (!p.role) return;
 
@@ -593,24 +642,20 @@
                 names[p.role].innerText = isMe ? '나 (Me)' : '상대방';
                 names[p.role].style.color = isMe ? 'var(--primary)' : 'var(--text-dark)';
 
-                // 내 이모티콘 버튼만 활성화
-                if (isMe) disableEmoticons(p.role, false);
+                if (isMe) disableControls(p.role, false);
 
-                // 이모티콘 애니메이션 처리
-                if (p.emojiId && p.emojiId !== lastEmojiIds[p.role]) {
-                    lastEmojiIds[p.role] = p.emojiId;
-                    showBubble(p.role, p.emoji);
+                // 새로운 메시지가 들어온 경우
+                if (p.messageId && p.messageId !== lastMessageIds[p.role]) {
+                    lastMessageIds[p.role] = p.messageId;
+                    showBubble(p.role, p.message);
                 }
             });
 
-            // 보드 렌더링
             renderBoard(data.board || {});
 
-            // 패널 하이라이트 (턴 표시)
             panels.black.classList.toggle('active', data.currentTurn === 'black' && data.gameStarted && !data.winner);
             panels.white.classList.toggle('active', data.currentTurn === 'white' && data.gameStarted && !data.winner);
 
-            // 상태바 메세지 및 턴 제어
             if (data.winner) {
                 const winnerText = data.winner === 'black' ? '흑돌' : '백돌';
                 const iWon = (data.winner === myRole);
@@ -638,22 +683,37 @@
             }
         }
 
-        // 이모티콘 말풍선 표시 애니메이션
-        function showBubble(role, emo) {
+        // 말풍선 표시 및 4초 후 제거/새 메시지 갱신 처리
+        function showBubble(role, text) {
             const bubble = bubbles[role];
-            bubble.innerText = emo;
-            bubble.classList.add('show');
 
-            if (emojiTimeouts[role]) clearTimeout(emojiTimeouts[role]);
-            emojiTimeouts[role] = setTimeout(() => {
+            // 기존 타이머 취소 (새 메시지가 오면 기존 사라짐 대기 초기화)
+            if (messageTimeouts[role]) {
+                clearTimeout(messageTimeouts[role]);
                 bubble.classList.remove('show');
-            }, 3000);
+            }
+
+            // 약간의 딜레이 후 새로운 메시지 적용 및 표시 (이전 말풍선과의 자연스러운 교체)
+            setTimeout(() => {
+                bubble.innerText = text;
+                bubble.classList.add('show');
+
+                // 4초 뒤 숨김 처리
+                messageTimeouts[role] = setTimeout(() => {
+                    bubble.classList.remove('show');
+                }, 4000);
+            }, 50);
         }
 
-        // 이모티콘 버튼 활성화/비활성화
-        function disableEmoticons(role, disabled) {
+        // 컨트롤(이모티콘 및 채팅 입력) 활성화/비활성화
+        function disableControls(role, disabled) {
             const btns = emoGroups[role].querySelectorAll('.emo-btn');
             btns.forEach(btn => btn.disabled = disabled);
+
+            if (myRole === role) {
+                chatInput.disabled = disabled;
+                chatBtn.disabled = disabled;
+            }
         }
 
         // 돌 놓기 로직
@@ -667,7 +727,7 @@
                 if (currentRoom.currentTurn !== myRole) return currentRoom;
 
                 currentRoom.board = currentRoom.board || {};
-                if (currentRoom.board[cellKey]) return currentRoom; // 이미 돌이 있음
+                if (currentRoom.board[cellKey]) return currentRoom;
 
                 currentRoom.board[cellKey] = myRole;
 
@@ -730,7 +790,6 @@
                 roomData.board = null;
                 roomData.winner = null;
 
-                // 역할 다시 섞기
                 const pIds = Object.keys(roomData.players || {});
                 if (pIds.length === 2) {
                     const isBlackFirst = Math.random() < 0.5;
