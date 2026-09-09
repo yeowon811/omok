@@ -521,7 +521,7 @@
                 const btn = document.createElement('button');
                 btn.className = 'emo-btn';
                 btn.innerText = emo;
-                btn.onclick = () => sendActionActivity(emo);
+                btn.onclick = () => sendChatMessage(emo);
                 emoGroups[color].appendChild(btn);
             });
         }
@@ -555,7 +555,7 @@
 
             runTransaction(roomRef, (roomData) => {
                 if (roomData === null) {
-                    roomData = { players: {}, gameStarted: false, lastActivity: serverTimestamp() };
+                    roomData = { players: {}, gameStarted: false, lastActivity: serverTimestamp(), chat: null };
                 }
                 if (!roomData.players) roomData.players = {};
 
@@ -566,7 +566,7 @@
                 }
 
                 if (!roomData.players[playerId]) {
-                    roomData.players[playerId] = { role: null, messageId: 0, message: '' };
+                    roomData.players[playerId] = { role: null };
                 }
 
                 const updatedPlayers = Object.keys(roomData.players);
@@ -594,7 +594,6 @@
                 onValue(roomRef, (snap) => {
                     const data = snap.val();
                     if (!data) {
-                        // 방이 폭파되었거나 존재하지 않는 경우
                         alert('2분 동안 반응이 없어 방이 폭파되었습니다.');
                         location.reload();
                         return;
@@ -602,41 +601,39 @@
                     handleRoomUpdate(data);
                 });
 
-                // 2분 비활동 감지 타이머 시작 (방을 생성한 사람이나 들어간 사람이 주기적으로 체크)
                 startInactivityChecker();
             });
         };
 
-        // 활동 시간 갱신을 동반하는 액션 처리
-        function sendActionActivity(msg) {
+        // 채팅 및 이모티콘 전송 함수 (방 전체 공유 데이터 `chat`에 기록)
+        function sendChatMessage(msg) {
             if (!myRole || !msg.trim()) return;
-            const myRef = ref(db, `rooms/${roomId}/players/${playerId}`);
-            update(myRef, {
-                message: msg.trim(),
-                messageId: Date.now()
-            });
-
-            // 방의 마지막 활동 시간 갱신
+            
             update(roomRef, {
+                chat: {
+                    senderRole: myRole,
+                    message: msg.trim(),
+                    messageId: Date.now()
+                },
                 lastActivity: serverTimestamp()
             });
         }
 
         // 채팅 입력창 이벤트
         chatBtn.onclick = () => {
-            sendActionActivity(chatInput.value);
+            sendChatMessage(chatInput.value);
             chatInput.value = '';
         };
 
         chatInput.onkeydown = (e) => {
             if (e.key === 'Enter') {
-                sendActionActivity(chatInput.value);
+                sendChatMessage(chatInput.value);
                 chatInput.value = '';
             }
         };
 
-        let lastMessageIds = { black: 0, white: 0 };
-        let messageTimeouts = { black: null, white: null };
+        let lastMessageId = 0;
+        let messageTimeout = null;
 
         // 상태 업데이트 처리
         function handleRoomUpdate(data) {
@@ -658,12 +655,13 @@
                 names[p.role].style.color = isMe ? 'var(--primary)' : 'var(--text-dark)';
 
                 if (isMe) disableControls(p.role, false);
-
-                if (p.messageId && p.messageId !== lastMessageIds[p.role]) {
-                    lastMessageIds[p.role] = p.messageId;
-                    showBubble(p.role, p.message);
-                }
             });
+
+            // 공유된 채팅 데이터 처리 (양쪽 모두에게 말풍선 표시)
+            if (data.chat && data.chat.messageId && data.chat.messageId !== lastMessageId) {
+                lastMessageId = data.chat.messageId;
+                showBubble(data.chat.senderRole, data.chat.message);
+            }
 
             renderBoard(data.board || {});
 
@@ -701,16 +699,17 @@
         function showBubble(role, text) {
             const bubble = bubbles[role];
 
-            if (messageTimeouts[role]) {
-                clearTimeout(messageTimeouts[role]);
-                bubble.classList.remove('show');
+            if (messageTimeout) {
+                clearTimeout(messageTimeout);
+                // 모든 말풍선 초기화 후 새로 출력
+                Object.values(bubbles).forEach(b => b.classList.remove('show'));
             }
 
             setTimeout(() => {
                 bubble.innerText = text;
                 bubble.classList.add('show');
 
-                messageTimeouts[role] = setTimeout(() => {
+                messageTimeout = setTimeout(() => {
                     bubble.classList.remove('show');
                 }, 4000);
             }, 50);
@@ -753,7 +752,7 @@
             });
         }
 
-        // 2분(120,000ms) 동안 활동이 없으면 방 삭제 실행 체크 함수
+        // 2분 동안 활동이 없으면 방 삭제 실행 체크 함수
         function startInactivityChecker() {
             if (inactivityInterval) clearInterval(inactivityInterval);
 
@@ -768,13 +767,12 @@
                     if (lastActivity) {
                         const now = Date.now();
                         const diff = now - lastActivity;
-                        // 2분 (120,000 밀리초) 경과 시 방 삭제
                         if (diff > 120000) {
                             remove(roomRef).catch(() => {});
                         }
                     }
                 }, { onlyOnce: true });
-            }, 10000); // 10초마다 체크
+            }, 10000);
         }
 
         // 보드 그리기
@@ -825,6 +823,7 @@
                 if (!roomData) return roomData;
                 roomData.board = null;
                 roomData.winner = null;
+                roomData.chat = null;
 
                 const pIds = Object.keys(roomData.players || {});
                 if (pIds.length === 2) {
