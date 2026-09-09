@@ -2,8 +2,18 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Firebase 실시간 오목</title>
+    <title> 오목</title>
     <style>
+        :root {
+            --primary: #4dabf7;
+            --primary-hover: #339af0;
+            --bg-color: #f8f9fa;
+            --board-bg: radial-gradient(circle at center, #e6a861, #c58336);
+            --board-line: #5c3a21;
+            --text-dark: #212529;
+            --text-muted: #868e96;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -15,92 +25,243 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            background-color: #f1f3f5;
-            padding: 24px 16px;
+            background-color: var(--bg-color);
+            min-height: 100vh;
+            padding: 40px 20px;
         }
 
         h1 {
-            margin-bottom: 12px;
-            color: #212529;
-            font-size: 1.8rem;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+            font-size: 2rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
         #status-bar {
-            margin-bottom: 16px;
+            margin-bottom: 24px;
             font-size: 1.1rem;
             font-weight: 600;
-            color: #343a40;
-            min-height: 27px;
+            color: var(--primary);
+            background: white;
+            padding: 10px 24px;
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
 
+        /* 로비 영역 */
         #lobby {
-            margin-bottom: 20px;
             background: #ffffff;
-            padding: 16px 24px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 24px 32px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
             display: flex;
-            gap: 10px;
+            gap: 12px;
             align-items: center;
+            margin-bottom: 30px;
+        }
+
+        input, button {
+            padding: 12px 18px;
+            font-size: 1rem;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        input {
+            border: 2px solid #e9ecef;
+            width: 200px;
+        }
+
+            input:focus {
+                border-color: var(--primary);
+            }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(77, 171, 247, 0.3);
+        }
+
+            button:hover:not(:disabled) {
+                background-color: var(--primary-hover);
+                transform: translateY(-1px);
+            }
+
+            button:disabled {
+                background-color: #ced4da;
+                cursor: not-allowed;
+                box-shadow: none;
+                transform: none;
+            }
+
+        #reset-btn {
+            background-color: #ff6b6b;
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+            display: none;
+            margin-bottom: 20px;
+        }
+
+            #reset-btn:hover:not(:disabled) {
+                background-color: #fa5252;
+            }
+
+        /* 게임 영역 (좌/우 캐릭터 + 중앙 보드) */
+        #game-area {
+            display: none; /* 방 입장 전에는 숨김 */
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        /* 플레이어 패널 (캐릭터) */
+        .player-panel {
+            background: white;
+            width: 160px;
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            position: relative;
+            border: 3px solid transparent;
+            transition: border-color 0.3s;
+        }
+
+            .player-panel.active {
+                border-color: var(--primary);
+                transform: scale(1.05);
+            }
+
+        .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            background: #f1f3f5;
+            margin-bottom: 12px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .role-badge {
+            font-weight: 700;
+            font-size: 0.9rem;
+            padding: 4px 12px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+            .role-badge.black {
+                background: #212529;
+                color: white;
+            }
+
+            .role-badge.white {
+                background: #f8f9fa;
+                color: #212529;
+                border: 1px solid #dee2e6;
+            }
+
+        .player-name {
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        /* 말풍선 (이모티콘) */
+        .bubble {
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+            .bubble.show {
+                opacity: 1;
+                visibility: visible;
+                top: -50px;
+            }
+
+            .bubble::after {
+                content: '';
+                position: absolute;
+                bottom: -6px;
+                left: 50%;
+                transform: translateX(-50%);
+                border-width: 6px 6px 0;
+                border-style: solid;
+                border-color: white transparent transparent transparent;
+            }
+
+        /* 이모티콘 버튼 그룹 */
+        .emoticon-group {
+            display: flex;
+            gap: 6px;
             flex-wrap: wrap;
             justify-content: center;
         }
 
-        input, select, button {
-            padding: 8px 14px;
-            font-size: 0.95rem;
-            border: 1px solid #ced4da;
-            border-radius: 6px;
-            outline: none;
-        }
-
-            input:focus, select:focus {
-                border-color: #228be6;
-            }
-
-        button {
-            background-color: #228be6;
-            color: #ffffff;
+        .emo-btn {
+            background: #f1f3f5;
             border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-size: 1rem;
             cursor: pointer;
-            font-weight: 600;
-            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
         }
 
-            button:hover:not(:disabled) {
-                background-color: #1c7ed6;
+            .emo-btn:hover {
+                background: #e9ecef;
             }
 
-            button:disabled {
-                background-color: #adb5bd;
+            .emo-btn:disabled {
+                opacity: 0.5;
                 cursor: not-allowed;
             }
 
-        #reset-btn {
-            background-color: #fa5252;
-        }
-
-            #reset-btn:hover:not(:disabled) {
-                background-color: #e03131;
-            }
-
+        /* 오목판 */
         #board-container {
-            background-color: #d89853;
-            padding: 18px;
-            border-radius: 8px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+            background: var(--board-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25), inset 0 2px 4px rgba(255,255,255,0.2);
+            position: relative;
         }
 
         #board {
             display: grid;
-            grid-template-columns: repeat(15, 34px);
-            grid-template-rows: repeat(15, 34px);
-            background-color: #deb887;
+            grid-template-columns: repeat(15, 36px);
+            grid-template-rows: repeat(15, 36px);
         }
 
         .cell {
-            width: 34px;
-            height: 34px;
+            width: 36px;
+            height: 36px;
             position: relative;
             cursor: pointer;
             display: flex;
@@ -113,9 +274,10 @@
                 position: absolute;
                 width: 100%;
                 height: 1px;
-                background-color: #5c3a21;
+                background-color: var(--board-line);
                 top: 50%;
                 left: 0;
+                z-index: 1;
             }
 
             .cell::after {
@@ -123,50 +285,134 @@
                 position: absolute;
                 width: 1px;
                 height: 100%;
-                background-color: #5c3a21;
+                background-color: var(--board-line);
                 left: 50%;
                 top: 0;
+                z-index: 1;
             }
 
+            /* 테두리 선 마감 처리 */
+            .cell:nth-child(15n + 1)::before {
+                width: 50%;
+                left: 50%;
+            }
+
+            .cell:nth-child(15n)::before {
+                width: 50%;
+                right: 50%;
+            }
+
+            .cell:nth-child(-n + 15)::after {
+                height: 50%;
+                top: 50%;
+            }
+
+            .cell:nth-last-child(-n + 15)::after {
+                height: 50%;
+                bottom: 50%;
+            }
+
+        /* 바둑돌 */
         .stone {
-            width: 26px;
-            height: 26px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             z-index: 2;
-            box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.35);
+            box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.4);
+            animation: dropStone 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-            .stone.black {
-                background: radial-gradient(circle at 35% 35%, #555, #111);
+        @keyframes dropStone {
+            0% {
+                transform: scale(0);
+                opacity: 0;
             }
 
-            .stone.white {
-                background: radial-gradient(circle at 35% 35%, #ffffff, #dcdcdc);
-                border: 1px solid #ced4da;
+            100% {
+                transform: scale(1);
+                opacity: 1;
             }
+        }
+
+        .stone.black {
+            background: radial-gradient(circle at 30% 30%, #666, #111);
+        }
+
+        .stone.white {
+            background: radial-gradient(circle at 30% 30%, #ffffff, #dcdcdc);
+            box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.2), inset 0 0 2px rgba(0,0,0,0.1);
+        }
+
+        /* 반응형 */
+        @media (max-width: 800px) {
+            #game-area {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .player-panel {
+                flex-direction: row;
+                width: 100%;
+                max-width: 300px;
+                justify-content: space-between;
+                padding: 10px 20px;
+            }
+
+            .avatar {
+                width: 50px;
+                height: 50px;
+                font-size: 2rem;
+                margin-bottom: 0;
+            }
+
+            .bubble {
+                top: -30px;
+            }
+
+                .bubble.show {
+                    top: -40px;
+                }
+        }
     </style>
 </head>
 <body>
 
-    <h1>Firebase 실시간 오목</h1>
     <div id="status-bar">방 이름을 입력하고 입장해주세요.</div>
 
     <div id="lobby">
-        <input type="text" id="room-input" placeholder="방 이름 (예: room1)">
-        <button id="join-btn">방 입장</button>
-        <span id="role-area" style="display: none; gap: 8px; align-items: center;">
-            <label for="stone-select">돌 선택:</label>
-            <select id="stone-select">
-                <option value="black">흑돌 (선공)</option>
-                <option value="white">백돌 (후공)</option>
-            </select>
-            <button id="ready-btn">준비 완료</button>
-        </span>
-        <button id="reset-btn" style="display: none;">새 게임</button>
+        <input type="text" id="room-input" placeholder="방 코드 (예: omok123)">
+        <button id="join-btn">게임 참가</button>
     </div>
 
-    <div id="board-container">
-        <div id="board"></div>
+    <button id="reset-btn">게임 다시 시작</button>
+
+    <div id="game-area">
+        <!-- 왼쪽: 흑돌 플레이어 -->
+        <div class="player-panel" id="panel-black">
+            <div class="bubble" id="bubble-black">😀</div>
+            <div class="avatar">👨‍🚀</div>
+            <div class="role-badge black">흑돌 (선공)</div>
+            <div class="player-name" id="name-black">대기 중...</div>
+            <div class="emoticon-group" id="emo-group-black">
+                <!-- JS에서 버튼 생성 -->
+            </div>
+        </div>
+
+        <!-- 중앙: 오목판 -->
+        <div id="board-container">
+            <div id="board"></div>
+        </div>
+
+        <!-- 오른쪽: 백돌 플레이어 -->
+        <div class="player-panel" id="panel-white">
+            <div class="bubble" id="bubble-white">😀</div>
+            <div class="avatar">🤖</div>
+            <div class="role-badge white">백돌 (후공)</div>
+            <div class="player-name" id="name-white">대기 중...</div>
+            <div class="emoticon-group" id="emo-group-white">
+                <!-- JS에서 버튼 생성 -->
+            </div>
+        </div>
     </div>
 
     <script type="module">
@@ -175,6 +421,7 @@
             getDatabase, ref, set, update, onValue, onDisconnect, runTransaction
         } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
+        // 기존과 동일한 Firebase 설정
         const firebaseConfig = {
             apiKey: "AIzaSyD3vjuiYIX_JxaLaw4CPQ72bRC2rekBf0s",
             authDomain: "omok-test-2b6df.firebaseapp.com",
@@ -182,15 +429,15 @@
             projectId: "omok-test-2b6df",
             storageBucket: "omok-test-2b6df.firebasestorage.app",
             messagingSenderId: "264913789921",
-            appId: "1:264913789921:web:c10bc870a5502b8de568a0",
-            measurementId: "G-HRQQ68W4QM"
+            appId: "1:264913789921:web:c10bc870a5502b8de568a0"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
         const BOARD_SIZE = 15;
-        const playerId = 'p_' + Math.random().toString(36).substring(2, 9);
+        const playerId = 'user_' + Math.random().toString(36).substring(2, 7);
+        const EMOTICONS = ['😀', '🤔', '🔥', '😭', '👏'];
 
         let roomId = null;
         let roomRef = null;
@@ -199,15 +446,46 @@
 
         // DOM 요소
         const statusBar = document.getElementById('status-bar');
-        const roomInput = document.getElementById('room-input');
+        const lobby = document.getElementById('lobby');
         const joinBtn = document.getElementById('join-btn');
-        const roleArea = document.getElementById('role-area');
-        const stoneSelect = document.getElementById('stone-select');
-        const readyBtn = document.getElementById('ready-btn');
+        const roomInput = document.getElementById('room-input');
+        const gameArea = document.getElementById('game-area');
         const resetBtn = document.getElementById('reset-btn');
         const boardEl = document.getElementById('board');
 
-        // 15x15 바둑판 그리드 생성
+        const panels = {
+            black: document.getElementById('panel-black'),
+            white: document.getElementById('panel-white')
+        };
+        const bubbles = {
+            black: document.getElementById('bubble-black'),
+            white: document.getElementById('bubble-white')
+        };
+        const names = {
+            black: document.getElementById('name-black'),
+            white: document.getElementById('name-white')
+        };
+        const emoGroups = {
+            black: document.getElementById('emo-group-black'),
+            white: document.getElementById('emo-group-white')
+        };
+
+        // 이모티콘 버튼 렌더링
+        function renderEmoticonButtons(color) {
+            emoGroups[color].innerHTML = '';
+            EMOTICONS.forEach(emo => {
+                const btn = document.createElement('button');
+                btn.className = 'emo-btn';
+                btn.innerText = emo;
+                btn.onclick = () => sendEmoticon(emo);
+                emoGroups[color].appendChild(btn);
+            });
+        }
+
+        renderEmoticonButtons('black');
+        renderEmoticonButtons('white');
+
+        // 바둑판 생성
         for (let r = 0; r < BOARD_SIZE; r++) {
             for (let c = 0; c < BOARD_SIZE; c++) {
                 const cell = document.createElement('div');
@@ -217,93 +495,126 @@
             }
         }
 
-        // 방 입장 핸들러
+        // 방 입장 (트랜잭션으로 자동 역할 할당)
         joinBtn.onclick = () => {
             roomId = roomInput.value.trim();
-            if (!roomId) return alert('방 이름을 입력하세요.');
+            if (!roomId) return alert('방 코드를 입력하세요.');
 
             roomRef = ref(db, `rooms/${roomId}`);
-            const playerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
+            const myPlayerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
 
-            // 접속 종료 시 플레이어 자동 제거
-            onDisconnect(playerRef).remove();
-            set(playerRef, { role: null, ready: false });
+            lobby.style.display = 'none';
+            gameArea.style.display = 'flex';
+            statusBar.innerText = '방에 접속 중입니다...';
 
-            joinBtn.disabled = true;
-            roomInput.disabled = true;
-            roleArea.style.display = 'inline-flex';
+            onDisconnect(myPlayerRef).remove();
 
-            // 실시간 데이터 감지
-            onValue(roomRef, (snapshot) => {
-                const data = snapshot.val();
-                if (!data) return;
-                handleRoomUpdate(data);
-            });
-        };
-
-        // 준비 완료 및 돌 선택 핸들러
-        readyBtn.onclick = async () => {
-            const selectedRole = stoneSelect.value;
-            const snapshot = await new Promise((resolve) => onValue(roomRef, resolve, { onlyOnce: true }));
-            const roomData = snapshot.val();
-            const players = roomData?.players || {};
-
-            // 중복 돌 선택 방지
-            const isTaken = Object.entries(players).some(([id, p]) => id !== playerId && p.role === selectedRole);
-            if (isTaken) {
-                return alert('상대방이 이미 해당 돌을 선택했습니다. 다른 돌을 선택하세요.');
-            }
-
-            myRole = selectedRole;
-            readyBtn.disabled = true;
-            stoneSelect.disabled = true;
-
-            await update(ref(db, `rooms/${roomId}/players/${playerId}`), {
-                role: myRole,
-                ready: true
-            });
-
-            // 시작 조건 확인
-            checkGameStart({
-                ...players,
-                [playerId]: { role: myRole, ready: true }
-            });
-        };
-
-        function checkGameStart(players) {
-            const ids = Object.keys(players);
-            if (ids.length === 2) {
-                const p1 = players[ids[0]];
-                const p2 = players[ids[1]];
-                if (p1.ready && p2.ready && p1.role && p2.role && p1.role !== p2.role) {
-                    update(roomRef, {
-                        gameStarted: true,
-                        currentTurn: 'black',
-                        winner: null
-                    });
+            // 트랜잭션을 통해 동시성 문제를 방지하고 역할을 랜덤하게 할당
+            runTransaction(roomRef, (roomData) => {
+                if (roomData === null) {
+                    roomData = { players: {}, gameStarted: false };
                 }
-            }
+                if (!roomData.players) roomData.players = {};
+
+                const currentPlayers = Object.keys(roomData.players);
+
+                // 이미 방이 꽉 찬 경우
+                if (currentPlayers.length >= 2 && !roomData.players[playerId]) {
+                    return; // 취소 (Transaction abort)
+                }
+
+                // 내 정보 추가
+                if (!roomData.players[playerId]) {
+                    roomData.players[playerId] = { role: null, emojiId: 0, emoji: '' };
+                }
+
+                const updatedPlayers = Object.keys(roomData.players);
+
+                // 두 명이 모이면 랜덤하게 흑/백 부여 후 게임 시작
+                if (updatedPlayers.length === 2 && !roomData.gameStarted) {
+                    const isBlackFirst = Math.random() < 0.5;
+                    roomData.players[updatedPlayers[0]].role = isBlackFirst ? 'black' : 'white';
+                    roomData.players[updatedPlayers[1]].role = isBlackFirst ? 'white' : 'black';
+
+                    roomData.gameStarted = true;
+                    roomData.currentTurn = 'black';
+                    roomData.winner = null;
+                    roomData.board = {};
+                }
+
+                return roomData;
+            }).then(({ committed, snapshot }) => {
+                if (!committed) {
+                    alert('방이 꽉 찼습니다. 다른 방을 이용해주세요.');
+                    location.reload();
+                    return;
+                }
+
+                // 데이터 리스너 등록
+                onValue(roomRef, (snap) => {
+                    const data = snap.val();
+                    if (data) handleRoomUpdate(data);
+                });
+            });
+        };
+
+        // 이모티콘 전송
+        function sendEmoticon(emo) {
+            if (!myRole) return;
+            const myRef = ref(db, `rooms/${roomId}/players/${playerId}`);
+            update(myRef, {
+                emoji: emo,
+                emojiId: Date.now() // 고유 ID를 변경해 이벤트 트리거
+            });
         }
 
-        // 상태 업데이트 반영
+        let lastEmojiIds = { black: 0, white: 0 };
+        let emojiTimeouts = { black: null, white: null };
+
+        // 상태 업데이트 처리
         function handleRoomUpdate(data) {
             const players = data.players || {};
-            const count = Object.keys(players).length;
-            const me = players[playerId];
+            const playerIds = Object.keys(players);
 
-            // 게임 재설정 감지 시 UI 복원
-            if (!data.gameStarted && !data.winner && (!me || !me.ready)) {
-                readyBtn.disabled = false;
-                stoneSelect.disabled = false;
-                myRole = null;
-            }
+            // 내 역할 확인
+            myRole = players[playerId]?.role;
 
+            // UI 초기화
+            names.black.innerText = '대기 중...';
+            names.white.innerText = '대기 중...';
+            disableEmoticons('black', true);
+            disableEmoticons('white', true);
+
+            // 접속자 패널 업데이트 및 이모티콘 처리
+            Object.entries(players).forEach(([id, p]) => {
+                if (!p.role) return;
+
+                const isMe = (id === playerId);
+                names[p.role].innerText = isMe ? '나 (Me)' : '상대방';
+                names[p.role].style.color = isMe ? 'var(--primary)' : 'var(--text-dark)';
+
+                // 내 이모티콘 버튼만 활성화
+                if (isMe) disableEmoticons(p.role, false);
+
+                // 이모티콘 애니메이션 처리
+                if (p.emojiId && p.emojiId !== lastEmojiIds[p.role]) {
+                    lastEmojiIds[p.role] = p.emojiId;
+                    showBubble(p.role, p.emoji);
+                }
+            });
+
+            // 보드 렌더링
             renderBoard(data.board || {});
 
-            // 1. 승리 판정 시
+            // 패널 하이라이트 (턴 표시)
+            panels.black.classList.toggle('active', data.currentTurn === 'black' && data.gameStarted && !data.winner);
+            panels.white.classList.toggle('active', data.currentTurn === 'white' && data.gameStarted && !data.winner);
+
+            // 상태바 메세지 및 턴 제어
             if (data.winner) {
-                const winnerText = data.winner === 'black' ? '흑돌(Black)' : '백돌(White)';
-                statusBar.innerText = `게임 종료! 승자: ${winnerText}`;
+                const winnerText = data.winner === 'black' ? '흑돌' : '백돌';
+                const iWon = (data.winner === myRole);
+                statusBar.innerText = `게임 종료! ${winnerText}이 승리했습니다. ${iWon ? '🎉 축하합니다!' : '😢 아쉽네요.'}`;
                 resetBtn.style.display = 'inline-block';
                 isMyTurn = false;
                 return;
@@ -311,28 +622,43 @@
 
             resetBtn.style.display = 'none';
 
-            // 2. 대기 상태 시
             if (!data.gameStarted) {
-                statusBar.innerText = count < 2
+                statusBar.innerText = playerIds.length < 2
                     ? '상대방 입장을 기다리고 있습니다... (1/2)'
-                    : '돌을 선택하고 준비 완료를 눌러주세요.';
+                    : '역할을 배정 중입니다...';
                 isMyTurn = false;
                 return;
             }
 
-            // 3. 게임 진행 중
             isMyTurn = (data.currentTurn === myRole);
-            const turnText = data.currentTurn === 'black' ? '흑돌' : '백돌';
-            const myRoleText = myRole === 'black' ? '흑돌' : '백돌';
-
-            statusBar.innerText = isMyTurn
-                ? `[나: ${myRoleText}] 내 차례입니다. 돌을 놓아주세요.`
-                : `[나: ${myRoleText}] 상대방(${turnText})이 생각 중입니다...`;
+            if (isMyTurn) {
+                statusBar.innerText = "나의 턴입니다. 돌을 놓아주세요.";
+            } else {
+                statusBar.innerText = "상대방의 턴을 기다리는 중입니다...";
+            }
         }
 
-        // 돌 착수 처리 (원자적 트랜잭션 적용)
+        // 이모티콘 말풍선 표시 애니메이션
+        function showBubble(role, emo) {
+            const bubble = bubbles[role];
+            bubble.innerText = emo;
+            bubble.classList.add('show');
+
+            if (emojiTimeouts[role]) clearTimeout(emojiTimeouts[role]);
+            emojiTimeouts[role] = setTimeout(() => {
+                bubble.classList.remove('show');
+            }, 3000);
+        }
+
+        // 이모티콘 버튼 활성화/비활성화
+        function disableEmoticons(role, disabled) {
+            const btns = emoGroups[role].querySelectorAll('.emo-btn');
+            btns.forEach(btn => btn.disabled = disabled);
+        }
+
+        // 돌 놓기 로직
         async function handleCellClick(r, c) {
-            if (!isMyTurn || !roomId) return;
+            if (!isMyTurn || !roomId || !myRole) return;
 
             const cellKey = `${r}_${c}`;
 
@@ -341,7 +667,7 @@
                 if (currentRoom.currentTurn !== myRole) return currentRoom;
 
                 currentRoom.board = currentRoom.board || {};
-                if (currentRoom.board[cellKey]) return currentRoom; // 이미 놓인 자리 무시
+                if (currentRoom.board[cellKey]) return currentRoom; // 이미 돌이 있음
 
                 currentRoom.board[cellKey] = myRole;
 
@@ -351,12 +677,11 @@
                 } else {
                     currentRoom.currentTurn = myRole === 'black' ? 'white' : 'black';
                 }
-
                 return currentRoom;
             });
         }
 
-        // 화면 보드 렌더링
+        // 보드 그리기
         function renderBoard(boardData) {
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
@@ -365,18 +690,22 @@
                     const val = boardData[`${r}_${c}`];
 
                     const existingStone = cell.querySelector('.stone');
-                    if (existingStone) cell.removeChild(existingStone);
+                    if (existingStone && !existingStone.classList.contains(val)) {
+                        cell.removeChild(existingStone);
+                    }
 
-                    if (val) {
+                    if (val && !cell.querySelector('.stone')) {
                         const stone = document.createElement('div');
                         stone.className = `stone ${val}`;
                         cell.appendChild(stone);
+                    } else if (!val && existingStone) {
+                        cell.removeChild(existingStone);
                     }
                 }
             }
         }
 
-        // 5목 연속 승리 검증 (가로, 세로, 양쪽 대각선)
+        // 오목 승리 검사
         function checkWin(boardData, r, c, color) {
             const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
             for (const [dr, dc] of directions) {
@@ -394,21 +723,21 @@
             return false;
         }
 
-        // 새 게임 초기화
+        // 게임 초기화
         resetBtn.onclick = () => {
             runTransaction(roomRef, (roomData) => {
                 if (!roomData) return roomData;
                 roomData.board = null;
-                roomData.gameStarted = false;
                 roomData.winner = null;
-                roomData.currentTurn = 'black';
 
-                // 모든 플레이어 준비 상태 리셋
-                if (roomData.players) {
-                    Object.keys(roomData.players).forEach((id) => {
-                        roomData.players[id].ready = false;
-                        roomData.players[id].role = null;
-                    });
+                // 역할 다시 섞기
+                const pIds = Object.keys(roomData.players || {});
+                if (pIds.length === 2) {
+                    const isBlackFirst = Math.random() < 0.5;
+                    roomData.players[pIds[0]].role = isBlackFirst ? 'black' : 'white';
+                    roomData.players[pIds[1]].role = isBlackFirst ? 'white' : 'black';
+                    roomData.gameStarted = true;
+                    roomData.currentTurn = 'black';
                 }
                 return roomData;
             });
