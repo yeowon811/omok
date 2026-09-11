@@ -835,6 +835,14 @@
                 roomData.board = null;
                 roomData.winner = null;
 
+                // 플레이어별 메시지 초기화
+                if (roomData.players) {
+                    Object.keys(roomData.players).forEach(pId => {
+                        roomData.players[pId].message = '';
+                        roomData.players[pId].messageId = 0;
+                    });
+                }
+
                 const pIds = Object.keys(roomData.players || {});
                 if (pIds.length === 2) {
                     const isBlackFirst = Math.random() < 0.5;
