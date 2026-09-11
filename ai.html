@@ -1,0 +1,2505 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>오목 (vs AI)</title>
+
+    <style>
+        :root {
+            --primary: #4dabf7;
+            --primary-hover: #339af0;
+            --bg-color: #f8f9fa;
+            --board-bg: radial-gradient(circle at center, #e6a861, #c58336);
+            --board-line: #5c3a21;
+            --text-dark: #212529;
+            --text-muted: #868e96;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: var(--bg-color);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            color: var(--text-dark);
+            margin-bottom: 8px;
+            font-size: 2rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        #status-bar {
+            margin-bottom: 24px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary);
+            background: white;
+            padding: 10px 24px;
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        /* 로비 영역 */
+        #lobby {
+            background: #ffffff;
+            padding: 24px 32px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        input, button {
+            padding: 12px 18px;
+            font-size: 1rem;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        input {
+            border: 2px solid #e9ecef;
+            width: 200px;
+        }
+
+            input:focus {
+                border-color: var(--primary);
+            }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(77, 171, 247, 0.3);
+        }
+
+            button:hover:not(:disabled) {
+                background-color: var(--primary-hover);
+                transform: translateY(-1px);
+            }
+
+            button:disabled {
+                background-color: #ced4da;
+                cursor: not-allowed;
+                box-shadow: none;
+                transform: none;
+            }
+
+        #reset-btn {
+            background-color: #ff6b6b;
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+            display: none;
+            margin-bottom: 20px;
+        }
+
+            #reset-btn:hover:not(:disabled) {
+                background-color: #fa5252;
+            }
+
+        /* 게임 영역 */
+        #game-wrapper {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        #game-area {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            width: 100%;
+        }
+
+        .player-panel {
+            background: white;
+            width: 160px;
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            position: relative;
+            border: 3px solid transparent;
+            transition: border-color 0.3s;
+        }
+
+            .player-panel.active {
+                border-color: var(--primary);
+                transform: scale(1.05);
+            }
+
+        .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            background: #f1f3f5;
+            margin-bottom: 12px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .role-badge {
+            font-weight: 700;
+            font-size: 0.9rem;
+            padding: 4px 12px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+            .role-badge.black {
+                background: #212529;
+                color: white;
+            }
+
+            .role-badge.white {
+                background: #f8f9fa;
+                color: #212529;
+                border: 1px solid #dee2e6;
+            }
+
+        .player-name {
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        /* 말풍선 */
+        .bubble {
+            position: absolute;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text-dark);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 10;
+            max-width: 200px;
+            word-break: break-all;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+            .bubble.show {
+                opacity: 1;
+                visibility: visible;
+                top: -60px;
+            }
+
+            .bubble::after {
+                content: '';
+                position: absolute;
+                bottom: -6px;
+                left: 50%;
+                transform: translateX(-50%);
+                border-width: 6px 6px 0;
+                border-style: solid;
+                border-color: white transparent transparent transparent;
+            }
+
+        /* 이모티콘 */
+        .emoticon-group {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .emo-btn {
+            background: #f1f3f5;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+            .emo-btn:hover {
+                background: #e9ecef;
+            }
+
+            .emo-btn:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+
+        /* 채팅 */
+        #chat-container {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            max-width: 400px;
+            background: white;
+            padding: 12px;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        #chat-input {
+            flex: 1;
+            width: auto;
+            padding: 10px 14px;
+            font-size: 0.95rem;
+        }
+
+        #chat-btn {
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            box-shadow: 0 2px 8px rgba(77, 171, 247, 0.3);
+        }
+
+        /* 오목판 */
+        #board-container {
+            background: var(--board-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25), inset 0 2px 4px rgba(255,255,255,0.2);
+            position: relative;
+        }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(15, 36px);
+            grid-template-rows: repeat(15, 36px);
+        }
+
+        .cell {
+            width: 36px;
+            height: 36px;
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+            .cell::before {
+                content: '';
+                position: absolute;
+                width: 100%;
+                height: 1px;
+                background-color: var(--board-line);
+                top: 50%;
+                left: 0;
+                z-index: 1;
+            }
+
+            .cell::after {
+                content: '';
+                position: absolute;
+                width: 1px;
+                height: 100%;
+                background-color: var(--board-line);
+                left: 50%;
+                top: 0;
+                z-index: 1;
+            }
+
+            .cell:nth-child(15n + 1)::before {
+                width: 50%;
+                left: 50%;
+            }
+
+            .cell:nth-child(15n)::before {
+                width: 50%;
+                right: 50%;
+            }
+
+            .cell:nth-child(-n + 15)::after {
+                height: 50%;
+                top: 50%;
+            }
+
+            .cell:nth-last-child(-n + 15)::after {
+                height: 50%;
+                bottom: 50%;
+            }
+
+        /* 바둑돌 */
+        .stone {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            z-index: 2;
+            box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.4);
+            animation: dropStone 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes dropStone {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .stone.black {
+            background: radial-gradient(circle at 30% 30%, #666, #111);
+        }
+
+        .stone.white {
+            background: radial-gradient(circle at 30% 30%, #ffffff, #dcdcdc);
+            box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.2), inset 0 0 2px rgba(0,0,0,0.1);
+        }
+
+        /* AI 생각 중 표시 */
+        #ai-thinking {
+            display: none;
+            position: fixed;
+            left: 50%;
+            bottom: 25px;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 100;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="status-bar">방 이름 입력 혹은 AI 대전을 시작하세요.</div>
+
+    <div id="lobby">
+        <input type="text"
+               id="room-input"
+               placeholder="방 코드 (예: omok123)">
+
+        <button id="join-btn">게임 참가</button>
+
+        <button id="ai-btn"
+                style="background:#51cf66;">
+            AI와 대전
+        </button>
+    </div>
+
+    <button id="reset-btn">
+        게임 다시 시작
+    </button>
+
+    <div id="game-wrapper">
+
+        <div id="game-area">
+
+            <div class="player-panel" id="panel-black">
+
+                <div class="bubble" id="bubble-black"></div>
+
+                <div class="avatar" id="avatar-black">
+                    👨‍🚀
+                </div>
+
+                <div class="role-badge black">
+                    흑돌 (선공)
+                </div>
+
+                <div class="player-name" id="name-black">
+                    대기 중...
+                </div>
+
+                <div class="emoticon-group" id="emo-group-black"></div>
+
+            </div>
+
+            <div id="board-container">
+                <div id="board"></div>
+            </div>
+
+            <div class="player-panel" id="panel-white">
+
+                <div class="bubble" id="bubble-white"></div>
+
+                <div class="avatar" id="avatar-white">
+                    🤖
+                </div>
+
+                <div class="role-badge white">
+                    백돌 (후공)
+                </div>
+
+                <div class="player-name" id="name-white">
+                    대기 중...
+                </div>
+
+                <div class="emoticon-group" id="emo-group-white"></div>
+
+            </div>
+
+        </div>
+
+        <div id="chat-container">
+
+            <input type="text"
+                   id="chat-input"
+                   placeholder="채팅을 입력하세요..."
+                   disabled>
+
+            <button id="chat-btn" disabled>
+                전송
+            </button>
+
+        </div>
+
+    </div>
+
+    <div id="ai-thinking">
+        AI가 생각하고 있습니다...
+    </div>
+
+
+    <script type="module">
+
+        import {
+            initializeApp
+        } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+
+        import {
+            getDatabase,
+            ref,
+            update,
+            remove,
+            onValue,
+            onDisconnect,
+            runTransaction,
+            serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+
+
+        /* =========================================================
+           Firebase
+        ========================================================= */
+
+        const firebaseConfig = {
+
+            apiKey: "AIzaSyD3vjuiYIX_JxaLaw4CPQ72bRC2rekBf0s",
+
+            authDomain: "omok-test-2b6df.firebaseapp.com",
+
+            databaseURL:
+                "https://omok-test-2b6df-default-rtdb.firebaseio.com",
+
+            projectId: "omok-test-2b6df",
+
+            storageBucket:
+                "omok-test-2b6df.firebasestorage.app",
+
+            messagingSenderId: "264913789921",
+
+            appId:
+                "1:264913789921:web:c10bc870a5502b8de568a0"
+
+        };
+
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+
+        /* =========================================================
+           기본 설정
+        ========================================================= */
+
+        const BOARD_SIZE = 15;
+
+        const playerId =
+            'user_' +
+            Math.random()
+                .toString(36)
+                .substring(2, 7);
+
+        const EMOTICONS = [
+            '😀',
+            '🤔',
+            '🔥',
+            '😭',
+            '👏'
+        ];
+
+
+        let roomId = null;
+        let roomRef = null;
+
+        let myRole = null;
+        let isMyTurn = false;
+
+        let aiMode = false;
+        let aiRole = null;
+
+        let aiThinking = false;
+
+
+        /* =========================================================
+           DOM
+        ========================================================= */
+
+        const statusBar =
+            document.getElementById('status-bar');
+
+        const lobby =
+            document.getElementById('lobby');
+
+        const joinBtn =
+            document.getElementById('join-btn');
+
+        const aiBtn =
+            document.getElementById('ai-btn');
+
+        const roomInput =
+            document.getElementById('room-input');
+
+        const gameWrapper =
+            document.getElementById('game-wrapper');
+
+        const resetBtn =
+            document.getElementById('reset-btn');
+
+        const boardEl =
+            document.getElementById('board');
+
+        const chatInput =
+            document.getElementById('chat-input');
+
+        const chatBtn =
+            document.getElementById('chat-btn');
+
+        const aiThinkingEl =
+            document.getElementById('ai-thinking');
+
+
+        const panels = {
+
+            black:
+                document.getElementById('panel-black'),
+
+            white:
+                document.getElementById('panel-white')
+
+        };
+
+
+        const bubbles = {
+
+            black:
+                document.getElementById('bubble-black'),
+
+            white:
+                document.getElementById('bubble-white')
+
+        };
+
+
+        const names = {
+
+            black:
+                document.getElementById('name-black'),
+
+            white:
+                document.getElementById('name-white')
+
+        };
+
+
+        const emoGroups = {
+
+            black:
+                document.getElementById('emo-group-black'),
+
+            white:
+                document.getElementById('emo-group-white')
+
+        };
+
+
+        /* =========================================================
+           이모티콘
+        ========================================================= */
+
+        function renderEmoticonButtons(color) {
+
+            emoGroups[color].innerHTML = '';
+
+            EMOTICONS.forEach(emo => {
+
+                const btn =
+                    document.createElement('button');
+
+                btn.className = 'emo-btn';
+
+                btn.innerText = emo;
+
+                btn.onclick = () => {
+                    sendActionActivity(emo);
+                };
+
+                emoGroups[color].appendChild(btn);
+
+            });
+
+        }
+
+
+        renderEmoticonButtons('black');
+        renderEmoticonButtons('white');
+
+
+        /* =========================================================
+           바둑판 생성
+        ========================================================= */
+
+        for (
+            let r = 0;
+            r < BOARD_SIZE;
+            r++
+        ) {
+
+            for (
+                let c = 0;
+                c < BOARD_SIZE;
+                c++
+            ) {
+
+                const cell =
+                    document.createElement('div');
+
+                cell.className = 'cell';
+
+                cell.onclick = () => {
+                    handleCellClick(r, c);
+                };
+
+                boardEl.appendChild(cell);
+
+            }
+        }
+
+
+        /* =========================================================
+           방 입장
+        ========================================================= */
+
+        async function joinRoom(isAi = false) {
+
+            roomId =
+                isAi
+                    ? 'ai_' + playerId
+                    : roomInput.value.trim();
+
+
+            if (!roomId) {
+
+                alert('방 코드를 입력하세요.');
+
+                return;
+            }
+
+
+            aiMode = isAi;
+
+            aiRole = 'white';
+
+
+            roomRef =
+                ref(
+                    db,
+                    `rooms/${roomId}`
+                );
+
+
+            const myPlayerRef =
+                ref(
+                    db,
+                    `rooms/${roomId}/players/${playerId}`
+                );
+
+
+            lobby.style.display = 'none';
+
+            gameWrapper.style.display = 'flex';
+
+            statusBar.innerText =
+                '게임 준비 중...';
+
+
+            onDisconnect(myPlayerRef).remove();
+
+
+            await runTransaction(
+                roomRef,
+                (roomData) => {
+
+                    if (roomData === null) {
+
+                        roomData = {
+
+                            players: {},
+
+                            gameStarted: false,
+
+                            lastActivity:
+                                serverTimestamp(),
+
+                            aiMode
+
+                        };
+
+                    }
+
+
+                    if (!roomData.players) {
+
+                        roomData.players = {};
+
+                    }
+
+
+                    roomData.players[playerId] = {
+
+                        role: 'black',
+
+                        messageId: 0,
+
+                        message: ''
+
+                    };
+
+
+                    if (aiMode) {
+
+                        roomData.players['ai'] = {
+
+                            role: 'white',
+
+                            messageId: 0,
+
+                            message: ''
+
+                        };
+
+
+                        roomData.gameStarted = true;
+
+                        roomData.currentTurn = 'black';
+
+                        roomData.board = {};
+
+                    }
+
+
+                    roomData.lastActivity =
+                        serverTimestamp();
+
+
+                    return roomData;
+
+                }
+            );
+
+
+            onValue(
+                roomRef,
+                (snap) => {
+
+                    const data = snap.val();
+
+                    if (data) {
+
+                        handleRoomUpdate(data);
+
+                    }
+
+                }
+            );
+
+        }
+
+
+        joinBtn.onclick =
+            () => joinRoom(false);
+
+        aiBtn.onclick =
+            () => joinRoom(true);
+
+
+        /* =========================================================
+           채팅 / 이모티콘
+        ========================================================= */
+
+        function sendActionActivity(msg) {
+
+            if (!myRole || !msg.trim()) {
+                return;
+            }
+
+
+            const now = Date.now();
+
+            showBubble(
+                myRole,
+                msg.trim()
+            );
+
+
+            lastMessageIds[myRole] = now;
+
+
+            update(
+                ref(
+                    db,
+                    `rooms/${roomId}/players/${playerId}`
+                ),
+                {
+                    message: msg.trim(),
+                    messageId: now
+                }
+            );
+
+
+            update(
+                roomRef,
+                {
+                    lastActivity:
+                        serverTimestamp()
+                }
+            );
+
+        }
+
+
+        chatBtn.onclick = () => {
+
+            sendActionActivity(
+                chatInput.value
+            );
+
+            chatInput.value = '';
+
+        };
+
+
+        let lastMessageIds = {
+            black: 0,
+            white: 0
+        };
+
+
+        let messageTimeouts = {
+            black: null,
+            white: null
+        };
+
+
+        /* =========================================================
+           Firebase 상태 업데이트
+        ========================================================= */
+
+        function handleRoomUpdate(data) {
+
+            const players =
+                data.players || {};
+
+
+            myRole =
+                players[playerId]?.role;
+
+
+            aiMode =
+                data.aiMode;
+
+
+            Object.entries(players)
+                .forEach(([id, p]) => {
+
+                    if (!p.role) {
+                        return;
+                    }
+
+
+                    const isMe =
+                        id === playerId;
+
+
+                    names[p.role].innerText =
+                        isMe
+                            ? '나 (Me)'
+                            : id === 'ai'
+                                ? 'AI'
+                                : '상대방';
+
+
+                    if (isMe) {
+
+                        disableControls(
+                            p.role,
+                            false
+                        );
+
+                    }
+
+
+                    if (
+                        p.messageId &&
+                        p.messageId !==
+                        lastMessageIds[p.role]
+                    ) {
+
+                        lastMessageIds[p.role] =
+                            p.messageId;
+
+                        showBubble(
+                            p.role,
+                            p.message
+                        );
+
+                    }
+
+                });
+
+
+            renderBoard(
+                data.board || {}
+            );
+
+
+            if (data.winner) {
+
+                aiThinking = false;
+
+                hideAiThinking();
+
+                statusBar.innerText =
+                    `게임 종료! ${data.winner === 'black'
+                        ? '흑돌'
+                        : '백돌'
+                    } 승리!`;
+
+
+                resetBtn.style.display =
+                    'inline-block';
+
+
+                return;
+            }
+
+
+            if (
+                data.gameStarted &&
+                aiMode &&
+                data.currentTurn === aiRole &&
+                !aiThinking
+            ) {
+
+                makeAiMove();
+
+            }
+
+
+            isMyTurn =
+                data.currentTurn === myRole;
+
+
+            statusBar.innerText =
+                isMyTurn
+                    ? "나의 턴입니다."
+                    : "상대방의 턴을 기다리는 중...";
+
+
+            panels.black.classList.toggle(
+                'active',
+                data.currentTurn === 'black'
+            );
+
+
+            panels.white.classList.toggle(
+                'active',
+                data.currentTurn === 'white'
+            );
+
+        }
+
+
+        /* =========================================================
+           말풍선
+        ========================================================= */
+
+        function showBubble(role, text) {
+
+            const bubble =
+                bubbles[role];
+
+
+            if (messageTimeouts[role]) {
+
+                clearTimeout(
+                    messageTimeouts[role]
+                );
+
+            }
+
+
+            bubble.innerText = text;
+
+            bubble.classList.add('show');
+
+
+            messageTimeouts[role] =
+                setTimeout(
+                    () => {
+                        bubble.classList.remove(
+                            'show'
+                        );
+                    },
+                    4000
+                );
+
+        }
+
+
+        /* =========================================================
+           컨트롤
+        ========================================================= */
+
+        function disableControls(
+            role,
+            disabled
+        ) {
+
+            if (myRole === role) {
+
+                chatInput.disabled =
+                    disabled;
+
+                chatBtn.disabled =
+                    disabled;
+
+            }
+
+        }
+
+
+        /* =========================================================
+           사람 클릭
+        ========================================================= */
+
+        async function handleCellClick(r, c) {
+
+            if (
+                !isMyTurn ||
+                !roomId ||
+                !myRole
+            ) {
+                return;
+            }
+
+
+            placeStone(
+                r,
+                c,
+                myRole
+            );
+
+        }
+
+
+        /* =========================================================
+           돌 놓기
+        ========================================================= */
+
+        async function placeStone(
+            r,
+            c,
+            color
+        ) {
+
+            const cellKey =
+                `${r}_${c}`;
+
+
+            await runTransaction(
+                roomRef,
+                (currentRoom) => {
+
+                    if (
+                        !currentRoom ||
+                        !currentRoom.gameStarted ||
+                        currentRoom.winner ||
+                        currentRoom.board?.[cellKey]
+                    ) {
+
+                        return currentRoom;
+
+                    }
+
+
+                    currentRoom.board =
+                        currentRoom.board || {};
+
+
+                    currentRoom.board[cellKey] =
+                        color;
+
+
+                    if (
+                        checkWin(
+                            currentRoom.board,
+                            r,
+                            c,
+                            color
+                        )
+                    ) {
+
+                        currentRoom.winner =
+                            color;
+
+                        currentRoom.gameStarted =
+                            false;
+
+                    } else {
+
+                        currentRoom.currentTurn =
+                            color === 'black'
+                                ? 'white'
+                                : 'black';
+
+                    }
+
+
+                    return currentRoom;
+
+                }
+            );
+
+        }
+
+
+        /* =========================================================
+           AI
+        ========================================================= */
+
+        function makeAiMove() {
+
+            if (aiThinking) {
+                return;
+            }
+
+
+            aiThinking = true;
+
+            showAiThinking();
+
+
+            onValue(
+                roomRef,
+                (snap) => {
+
+                    const data =
+                        snap.val();
+
+
+                    if (
+                        !data ||
+                        data.currentTurn !== aiRole ||
+                        data.winner
+                    ) {
+
+                        aiThinking = false;
+
+                        hideAiThinking();
+
+                        return;
+
+                    }
+
+
+                    const board =
+                        cloneBoard(
+                            data.board || {}
+                        );
+
+
+                    setTimeout(
+                        async () => {
+
+                            const bestMove =
+                                findBestMove(board);
+
+
+                            if (bestMove) {
+
+                                await placeStone(
+                                    bestMove.r,
+                                    bestMove.c,
+                                    aiRole
+                                );
+
+                            }
+
+
+                            aiThinking = false;
+
+                            hideAiThinking();
+
+                        },
+                        500
+                    );
+
+                },
+                {
+                    onlyOnce: true
+                }
+            );
+
+        }
+
+
+        /* =========================================================
+           AI 핵심
+        ========================================================= */
+
+        function findBestMove(board) {
+
+            const ai = aiRole;
+
+            const opponent =
+                ai === 'black'
+                    ? 'white'
+                    : 'black';
+
+
+            const candidates =
+                getCandidateMoves(board);
+
+
+            if (candidates.length === 0) {
+
+                return {
+                    r: 7,
+                    c: 7
+                };
+
+            }
+
+
+            /* -----------------------------------------------------
+               1. 즉시 승리
+            ----------------------------------------------------- */
+
+            for (const move of candidates) {
+
+                const key =
+                    `${move.r}_${move.c}`;
+
+                board[key] = ai;
+
+
+                if (
+                    checkWin(
+                        board,
+                        move.r,
+                        move.c,
+                        ai
+                    )
+                ) {
+
+                    delete board[key];
+
+                    return move;
+
+                }
+
+
+                delete board[key];
+
+            }
+
+
+            /* -----------------------------------------------------
+               2. 상대방 즉시 승리 차단
+            ----------------------------------------------------- */
+
+            for (const move of candidates) {
+
+                const key =
+                    `${move.r}_${move.c}`;
+
+                board[key] = opponent;
+
+
+                if (
+                    checkWin(
+                        board,
+                        move.r,
+                        move.c,
+                        opponent
+                    )
+                ) {
+
+                    delete board[key];
+
+                    return move;
+
+                }
+
+
+                delete board[key];
+
+            }
+
+
+            /* -----------------------------------------------------
+               3. 모든 후보 평가
+            ----------------------------------------------------- */
+
+            let bestScore =
+                -Infinity;
+
+            let bestMoves = [];
+
+
+            for (const move of candidates) {
+
+                const key =
+                    `${move.r}_${move.c}`;
+
+
+                board[key] = ai;
+
+
+                /* 현재 내가 만드는 공격력 */
+                const attackScore =
+                    evaluatePosition(
+                        board,
+                        move.r,
+                        move.c,
+                        ai
+                    );
+
+
+                /* 상대방이 다음에 만들 수 있는 공격력 */
+                const opponentThreat =
+                    findBestOpponentThreat(
+                        board,
+                        opponent
+                    );
+
+
+                /* 중심 선호 */
+                const centerScore =
+                    getCenterScore(
+                        move.r,
+                        move.c
+                    );
+
+
+                /* 주변 돌이 많을수록 조금 가산 */
+                const neighborScore =
+                    countNearbyStones(
+                        board,
+                        move.r,
+                        move.c
+                    ) * 15;
+
+
+                const totalScore =
+                    attackScore +
+                    centerScore +
+                    neighborScore -
+                    opponentThreat * 0.9;
+
+
+                delete board[key];
+
+
+                if (
+                    totalScore >
+                    bestScore
+                ) {
+
+                    bestScore =
+                        totalScore;
+
+                    bestMoves = [move];
+
+                } else if (
+                    totalScore ===
+                    bestScore
+                ) {
+
+                    bestMoves.push(move);
+
+                }
+
+            }
+
+
+            if (bestMoves.length === 0) {
+
+                return candidates[0];
+
+            }
+
+
+            /* 같은 점수면 랜덤이 아니라 중앙 우선 */
+            bestMoves.sort(
+                (a, b) =>
+                    getCenterScore(
+                        b.r,
+                        b.c
+                    ) -
+                    getCenterScore(
+                        a.r,
+                        a.c
+                    )
+            );
+
+
+            return bestMoves[0];
+
+        }
+
+
+        /* =========================================================
+           후보 수 생성
+        ========================================================= */
+
+        function getCandidateMoves(board) {
+
+            const occupied =
+                Object.keys(board);
+
+
+            if (occupied.length === 0) {
+
+                return [
+                    {
+                        r: 7,
+                        c: 7
+                    }
+                ];
+
+            }
+
+
+            const candidateMap =
+                new Map();
+
+
+            for (const key of occupied) {
+
+                const [r, c] =
+                    key.split('_')
+                        .map(Number);
+
+
+                for (
+                    let dr = -2;
+                    dr <= 2;
+                    dr++
+                ) {
+
+                    for (
+                        let dc = -2;
+                        dc <= 2;
+                        dc++
+                    ) {
+
+                        if (
+                            dr === 0 &&
+                            dc === 0
+                        ) {
+                            continue;
+                        }
+
+
+                        const nr =
+                            r + dr;
+
+                        const nc =
+                            c + dc;
+
+
+                        if (
+                            nr < 0 ||
+                            nr >= BOARD_SIZE ||
+                            nc < 0 ||
+                            nc >= BOARD_SIZE
+                        ) {
+                            continue;
+                        }
+
+
+                        const candidateKey =
+                            `${nr}_${nc}`;
+
+
+                        if (
+                            !board[candidateKey] &&
+                            !candidateMap.has(
+                                candidateKey
+                            )
+                        ) {
+
+                            candidateMap.set(
+                                candidateKey,
+                                {
+                                    r: nr,
+                                    c: nc
+                                }
+                            );
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+
+            const candidates =
+                Array.from(
+                    candidateMap.values()
+                );
+
+
+            /*
+             * 후보가 너무 많아지는 것을 방지
+             *
+             * 최대 40개까지만 평가
+             */
+
+            candidates.sort(
+                (a, b) => {
+
+                    const scoreA =
+                        quickMoveScore(
+                            board,
+                            a.r,
+                            a.c
+                        );
+
+                    const scoreB =
+                        quickMoveScore(
+                            board,
+                            b.r,
+                            b.c
+                        );
+
+                    return scoreB - scoreA;
+
+                }
+            );
+
+
+            return candidates.slice(
+                0,
+                40
+            );
+
+        }
+
+
+        /* =========================================================
+           빠른 후보 평가
+        ========================================================= */
+
+        function quickMoveScore(
+            board,
+            r,
+            c
+        ) {
+
+            const ai =
+                aiRole;
+
+            const opponent =
+                ai === 'black'
+                    ? 'white'
+                    : 'black';
+
+
+            let score = 0;
+
+
+            board[`${r}_${c}`] =
+                ai;
+
+
+            score +=
+                evaluatePosition(
+                    board,
+                    r,
+                    c,
+                    ai
+                );
+
+
+            delete board[`${r}_${c}`];
+
+
+            board[`${r}_${c}`] =
+                opponent;
+
+
+            score +=
+                evaluatePosition(
+                    board,
+                    r,
+                    c,
+                    opponent
+                ) * 0.8;
+
+
+            delete board[`${r}_${c}`];
+
+
+            score +=
+                getCenterScore(r, c);
+
+
+            score +=
+                countNearbyStones(
+                    board,
+                    r,
+                    c
+                ) * 10;
+
+
+            return score;
+
+        }
+
+
+        /* =========================================================
+           특정 위치의 오목 패턴 평가
+        ========================================================= */
+
+        function evaluatePosition(
+            board,
+            r,
+            c,
+            color
+        ) {
+
+            let score = 0;
+
+
+            const directions = [
+
+                [0, 1],
+
+                [1, 0],
+
+                [1, 1],
+
+                [1, -1]
+
+            ];
+
+
+            for (const [dr, dc] of directions) {
+
+                const line =
+                    getLineInfo(
+                        board,
+                        r,
+                        c,
+                        dr,
+                        dc,
+                        color
+                    );
+
+
+                score +=
+                    evaluateLine(
+                        line.count,
+                        line.openEnds,
+                        line.blocked
+                    );
+
+            }
+
+
+            return score;
+
+        }
+
+
+        /* =========================================================
+           한 방향의 돌 개수와 열린 공간 조사
+        ========================================================= */
+
+        function getLineInfo(
+            board,
+            r,
+            c,
+            dr,
+            dc,
+            color
+        ) {
+
+            let count = 1;
+
+            let openEnds = 0;
+
+            let blocked = 0;
+
+
+            /* 한쪽 */
+
+            let nr = r + dr;
+            let nc = c + dc;
+
+
+            while (
+                nr >= 0 &&
+                nr < BOARD_SIZE &&
+                nc >= 0 &&
+                nc < BOARD_SIZE &&
+                board[`${nr}_${nc}`] === color
+            ) {
+
+                count++;
+
+                nr += dr;
+                nc += dc;
+
+            }
+
+
+            if (
+                nr >= 0 &&
+                nr < BOARD_SIZE &&
+                nc >= 0 &&
+                nc < BOARD_SIZE
+            ) {
+
+                if (
+                    !board[`${nr}_${nc}`]
+                ) {
+
+                    openEnds++;
+
+                } else {
+
+                    blocked++;
+
+                }
+
+            } else {
+
+                blocked++;
+
+            }
+
+
+            /* 반대쪽 */
+
+            nr = r - dr;
+            nc = c - dc;
+
+
+            while (
+                nr >= 0 &&
+                nr < BOARD_SIZE &&
+                nc >= 0 &&
+                nc < BOARD_SIZE &&
+                board[`${nr}_${nc}`] === color
+            ) {
+
+                count++;
+
+                nr -= dr;
+                nc -= dc;
+
+            }
+
+
+            if (
+                nr >= 0 &&
+                nr < BOARD_SIZE &&
+                nc >= 0 &&
+                nc < BOARD_SIZE
+            ) {
+
+                if (
+                    !board[`${nr}_${nc}`]
+                ) {
+
+                    openEnds++;
+
+                } else {
+
+                    blocked++;
+
+                }
+
+            } else {
+
+                blocked++;
+
+            }
+
+
+            return {
+                count,
+                openEnds,
+                blocked
+            };
+
+        }
+
+
+        /* =========================================================
+           오목 패턴 점수
+        ========================================================= */
+
+        function evaluateLine(
+            count,
+            openEnds,
+            blocked
+        ) {
+
+            /*
+             * 5목
+             */
+
+            if (count >= 5) {
+                return 1000000;
+            }
+
+
+            /*
+             * 4목
+             */
+
+            if (count === 4) {
+
+                if (openEnds === 2) {
+                    return 100000;
+                }
+
+                if (openEnds === 1) {
+                    return 15000;
+                }
+
+            }
+
+
+            /*
+             * 3목
+             */
+
+            if (count === 3) {
+
+                if (openEnds === 2) {
+                    return 12000;
+                }
+
+                if (openEnds === 1) {
+                    return 1800;
+                }
+
+            }
+
+
+            /*
+             * 2목
+             */
+
+            if (count === 2) {
+
+                if (openEnds === 2) {
+                    return 1000;
+                }
+
+                if (openEnds === 1) {
+                    return 150;
+                }
+
+            }
+
+
+            /*
+             * 1목
+             */
+
+            if (count === 1) {
+
+                if (openEnds === 2) {
+                    return 40;
+                }
+
+            }
+
+
+            /*
+             * 막힌 경우에도 아주 작은 가치
+             */
+
+            if (blocked >= 2) {
+                return 0;
+            }
+
+
+            return 10;
+
+        }
+
+
+        /* =========================================================
+           상대방의 가장 강한 다음 수 계산
+        ========================================================= */
+
+        function findBestOpponentThreat(
+            board,
+            opponent
+        ) {
+
+            const moves =
+                getCandidateMovesForColor(
+                    board,
+                    opponent
+                );
+
+
+            let best =
+                0;
+
+
+            for (const move of moves) {
+
+                const key =
+                    `${move.r}_${move.c}`;
+
+
+                board[key] =
+                    opponent;
+
+
+                if (
+                    checkWin(
+                        board,
+                        move.r,
+                        move.c,
+                        opponent
+                    )
+                ) {
+
+                    delete board[key];
+
+                    return 1000000;
+
+                }
+
+
+                const score =
+                    evaluatePosition(
+                        board,
+                        move.r,
+                        move.c,
+                        opponent
+                    );
+
+
+                if (score > best) {
+                    best = score;
+                }
+
+
+                delete board[key];
+
+            }
+
+
+            return best;
+
+        }
+
+
+        /* =========================================================
+           특정 색깔의 후보
+        ========================================================= */
+
+        function getCandidateMovesForColor(
+            board,
+            color
+        ) {
+
+            const occupied =
+                Object.keys(board);
+
+
+            if (occupied.length === 0) {
+
+                return [
+                    {
+                        r: 7,
+                        c: 7
+                    }
+                ];
+
+            }
+
+
+            const map =
+                new Map();
+
+
+            for (const key of occupied) {
+
+                const [r, c] =
+                    key.split('_')
+                        .map(Number);
+
+
+                for (
+                    let dr = -2;
+                    dr <= 2;
+                    dr++
+                ) {
+
+                    for (
+                        let dc = -2;
+                        dc <= 2;
+                        dc++
+                    ) {
+
+                        if (
+                            dr === 0 &&
+                            dc === 0
+                        ) {
+                            continue;
+                        }
+
+
+                        const nr =
+                            r + dr;
+
+                        const nc =
+                            c + dc;
+
+
+                        if (
+                            nr < 0 ||
+                            nr >= BOARD_SIZE ||
+                            nc < 0 ||
+                            nc >= BOARD_SIZE
+                        ) {
+                            continue;
+                        }
+
+
+                        const candidateKey =
+                            `${nr}_${nc}`;
+
+
+                        if (
+                            !board[candidateKey]
+                        ) {
+
+                            map.set(
+                                candidateKey,
+                                {
+                                    r: nr,
+                                    c: nc
+                                }
+                            );
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+
+            return Array.from(
+                map.values()
+            ).slice(0, 20);
+
+        }
+
+
+        /* =========================================================
+           중앙에 가까운 위치 선호
+        ========================================================= */
+
+        function getCenterScore(
+            r,
+            c
+        ) {
+
+            const center =
+                (BOARD_SIZE - 1) / 2;
+
+
+            const distance =
+                Math.abs(r - center) +
+                Math.abs(c - center);
+
+
+            return Math.max(
+                0,
+                30 - distance * 2
+            );
+
+        }
+
+
+        /* =========================================================
+           주변 돌 개수
+        ========================================================= */
+
+        function countNearbyStones(
+            board,
+            r,
+            c
+        ) {
+
+            let count = 0;
+
+
+            for (
+                let dr = -2;
+                dr <= 2;
+                dr++
+            ) {
+
+                for (
+                    let dc = -2;
+                    dc <= 2;
+                    dc++
+                ) {
+
+                    if (
+                        dr === 0 &&
+                        dc === 0
+                    ) {
+                        continue;
+                    }
+
+
+                    const nr =
+                        r + dr;
+
+                    const nc =
+                        c + dc;
+
+
+                    if (
+                        nr < 0 ||
+                        nr >= BOARD_SIZE ||
+                        nc < 0 ||
+                        nc >= BOARD_SIZE
+                    ) {
+                        continue;
+                    }
+
+
+                    if (
+                        board[`${nr}_${nc}`]
+                    ) {
+
+                        count++;
+
+                    }
+
+                }
+
+            }
+
+
+            return count;
+
+        }
+
+
+        /* =========================================================
+           객체 복사
+        ========================================================= */
+
+        function cloneBoard(board) {
+
+            return {
+                ...board
+            };
+
+        }
+
+
+        /* =========================================================
+           AI 생각 표시
+        ========================================================= */
+
+        function showAiThinking() {
+
+            aiThinkingEl.style.display =
+                'block';
+
+        }
+
+
+        function hideAiThinking() {
+
+            aiThinkingEl.style.display =
+                'none';
+
+        }
+
+
+        /* =========================================================
+           바둑판 렌더링
+        ========================================================= */
+
+        function renderBoard(boardData) {
+
+            boardData =
+                boardData || {};
+
+
+            for (
+                let r = 0;
+                r < BOARD_SIZE;
+                r++
+            ) {
+
+                for (
+                    let c = 0;
+                    c < BOARD_SIZE;
+                    c++
+                ) {
+
+                    const cell =
+                        boardEl.children[
+                        r * BOARD_SIZE + c
+                        ];
+
+
+                    const val =
+                        boardData[
+                        `${r}_${c}`
+                        ];
+
+
+                    if (
+                        val &&
+                        !cell.querySelector('.stone')
+                    ) {
+
+                        const stone =
+                            document.createElement('div');
+
+
+                        stone.className =
+                            `stone ${val}`;
+
+
+                        cell.appendChild(stone);
+
+                    } else if (
+                        !val &&
+                        cell.querySelector('.stone')
+                    ) {
+
+                        cell.innerHTML = '';
+
+                    }
+
+                }
+
+            }
+
+        }
+
+
+        /* =========================================================
+           승리 판정
+        ========================================================= */
+
+        function checkWin(
+            boardData,
+            r,
+            c,
+            color
+        ) {
+
+            const directions = [
+
+                [0, 1],
+
+                [1, 0],
+
+                [1, 1],
+
+                [1, -1]
+
+            ];
+
+
+            for (const [dr, dc] of directions) {
+
+                let count = 1;
+
+
+                for (
+                    let s = 1;
+                    s < 5;
+                    s++
+                ) {
+
+                    if (
+                        boardData[
+                        `${r + dr * s}_${c + dc * s}`
+                        ] === color
+                    ) {
+
+                        count++;
+
+                    } else {
+
+                        break;
+
+                    }
+
+                }
+
+
+                for (
+                    let s = 1;
+                    s < 5;
+                    s++
+                ) {
+
+                    if (
+                        boardData[
+                        `${r - dr * s}_${c - dc * s}`
+                        ] === color
+                    ) {
+
+                        count++;
+
+                    } else {
+
+                        break;
+
+                    }
+
+                }
+
+
+                if (count >= 5) {
+
+                    return true;
+
+                }
+
+            }
+
+
+            return false;
+
+        }
+
+
+        /* =========================================================
+           게임 재시작
+        ========================================================= */
+
+        resetBtn.onclick = () => {
+
+            aiThinking = false;
+
+            hideAiThinking();
+
+
+            runTransaction(
+                roomRef,
+                (roomData) => {
+
+                    if (!roomData) {
+                        return roomData;
+                    }
+
+
+                    roomData.board = null;
+
+                    roomData.winner = null;
+
+
+                    Object.keys(
+                        roomData.players || {}
+                    ).forEach(
+                        pId => {
+
+                            roomData.players[pId].message =
+                                '';
+
+                            roomData.players[pId].messageId =
+                                0;
+
+                        }
+                    );
+
+
+                    roomData.currentTurn =
+                        'black';
+
+
+                    roomData.gameStarted =
+                        true;
+
+
+                    return roomData;
+
+                }
+            );
+
+        };
+
+    </script>
+
+</body>
+</html>
